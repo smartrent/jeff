@@ -1,0 +1,5 @@
+%{
+  "cerlc": {:hex, :cerlc, "0.2.0", "6722c3ee5aaa196fc47ad3ba6de9b9c44d782611d0fbeb477b33d53ab6b09ba0", [:rebar3], [], "hexpm", "9a4d3368667fc63925198b4c3ebf554b8d54c47ef42bd6d0c6ae8de811b4f6c4"},
+  "circuits_uart": {:hex, :circuits_uart, "1.4.3", "3753ed5b8792bab65f3e3c9c4ef00c51bcd5af7bb504bdfcba0648cb9b37e0de", [:mix], [{:elixir_make, "~> 0.6", [hex: :elixir_make, repo: "hexpm", optional: false]}], "hexpm", "80e568af4144ebf060af19d9354a545f96fe1ac069d91ac852ee9f2cee8af581"},
+  "elixir_make": {:hex, :elixir_make, "0.6.2", "7dffacd77dec4c37b39af867cedaabb0b59f6a871f89722c25b28fcd4bd70530", [:mix], [], "hexpm", "03e49eadda22526a7e5279d53321d1cced6552f344ba4e03e619063de75348d9"},
+}
