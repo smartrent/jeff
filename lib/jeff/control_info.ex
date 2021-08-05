@@ -1,53 +1,39 @@
 defmodule Jeff.ControlInfo do
-  defstruct sequence_number: 0,
-            check_scheme: :checksum,
-            security_control_block?: false,
-            byte: nil
-
-  @spec new(keyword()) :: %__MODULE__{}
-  def new(options \\ []) do
-    struct(__MODULE__, options) |> build()
+  def encode(%{sequence: seq, check_scheme: cs, security?: sec}) do
+    encode(seq, cs, sec)
   end
 
-  defp build(
-         %{
-           sequence_number: sequence_number,
-           check_scheme: check_scheme,
-           security_control_block?: security_control_block
-         } = info
-       ) do
+  def encode(sequence, check_scheme, security?) do
     check_scheme =
       case check_scheme do
         :checksum -> 0
         :crc -> 1
       end
 
-    security_control_block =
-      case security_control_block do
+    security? =
+      case security? do
         false -> 0
         true -> 1
       end
 
     <<byte>> = <<
       0::size(4),
-      security_control_block::size(1),
+      security?::size(1),
       check_scheme::size(1),
-      sequence_number::size(2)
+      sequence::size(2)
     >>
 
-    %{info | byte: byte}
+    byte
   end
 
-  @spec from_byte(binary()) :: %__MODULE__{}
-  def from_byte(<<byte>>), do: from_byte(byte)
+  def decode(<<byte>>), do: decode(byte)
 
-  @spec from_byte(integer()) :: %__MODULE__{}
-  def from_byte(byte) when is_integer(byte) do
+  def decode(byte) when is_integer(byte) do
     <<
       0::size(4),
-      security_control_block::size(1),
+      security?::size(1),
       check_scheme::size(1),
-      sequence_number::size(2)
+      sequence::size(2)
     >> = <<byte>>
 
     check_scheme =
@@ -56,16 +42,12 @@ defmodule Jeff.ControlInfo do
         1 -> :crc
       end
 
-    security_control_block =
-      case security_control_block do
+    security? =
+      case security? do
         0 -> false
         1 -> true
       end
 
-    new(
-      sequence_number: sequence_number,
-      check_scheme: check_scheme,
-      security_control_block?: security_control_block
-    )
+    {sequence, check_scheme, security?}
   end
 end
