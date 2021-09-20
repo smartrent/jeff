@@ -15,7 +15,7 @@ defmodule Jeff.MixProject do
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
-      extra_applications: [:logger]
+      extra_applications: [:logger, :crypto]
     ]
   end
 
@@ -26,7 +26,10 @@ defmodule Jeff.MixProject do
   defp deps do
     [
       {:circuits_uart, "~> 1.4"},
-      {:cerlc, "0.2.0"}
+      {:cerlc, "~> 0.2.0"},
+      {:connection, "~> 1.1.0"},
+      {:credo, "~> 1.5", only: [:dev, :test], runtime: false},
+      {:dialyxir, "~> 1.1", only: [:dev], runtime: false}
     ]
   end
 end
