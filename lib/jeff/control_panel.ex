@@ -4,8 +4,16 @@ defmodule Jeff.ControlPanel do
   use GenServer
   alias Jeff.{Bus, Command, Message, Reply, SecureChannel, Transport}
 
-  def start_link(opts \\ []) do
-    GenServer.start_link(__MODULE__, opts)
+  def start_link(name, opts \\ []) do
+    GenServer.start_link(__MODULE__, opts, name: __MODULE__.Registry.via(name))
+  end
+
+  def child_spec(name, opts) do
+    %{
+      id: name,
+      start: {__MODULE__, :start_link, [name, opts]},
+      restart: :transient
+    }
   end
 
   def add_device(pid, address, opts \\ []) do
@@ -55,12 +63,11 @@ defmodule Jeff.ControlPanel do
 
   @impl GenServer
   def init(opts) do
-    handler = Keyword.get(opts, :handler)
     serial_port = Keyword.get(opts, :serial_port, "/dev/ttyUSB0")
     {:ok, conn} = Transport.start_link({serial_port, self(), opts})
 
     state = Bus.new()
-    state = %{state | conn: conn, handler: handler}
+    state = %{state | conn: conn}
 
     {:ok, tick(state)}
   end
@@ -75,10 +82,8 @@ defmodule Jeff.ControlPanel do
 
   @impl GenServer
   def handle_call({:add_device, opts}, _from, state) do
-    address = Keyword.fetch!(opts, :address)
     state = Bus.add_device(state, opts)
-    device = Bus.get_device(state, address)
-    {:reply, device, state}
+    {:reply, :ok, state}
   end
 
   @impl GenServer
@@ -117,6 +122,18 @@ defmodule Jeff.ControlPanel do
 
     reply = Reply.new(reply_message)
 
+    if reply.name == KEYPAD do
+      name = __MODULE__.Registry.name(self())
+      message = {:keypress, name, reply.address, reply.data}
+      __MODULE__.PubSub.publish(name, message)
+    end
+
+    if reply.name == RAW do
+      name = __MODULE__.Registry.name(self())
+      message = {:raw, name, reply.address, reply.data}
+      __MODULE__.PubSub.publish(name, message)
+    end
+
     state = handle_reply(state, reply)
 
     if command.caller do
@@ -150,12 +167,6 @@ defmodule Jeff.ControlPanel do
     secure_channel = SecureChannel.establish(device.secure_channel, reply.data)
     device = %{device | secure_channel: secure_channel}
     Bus.put_device(state, device)
-  end
-
-  defp handle_reply(%{handler: {m, f, _a}} = state, %{name: name} = reply)
-       when name in [RAW, KEYPAD] do
-    apply(m, f, [reply])
-    state
   end
 
   defp handle_reply(state, _reply), do: state
