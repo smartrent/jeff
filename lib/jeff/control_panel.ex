@@ -2,7 +2,7 @@ defmodule Jeff.ControlPanel do
   require Logger
 
   use GenServer
-  alias Jeff.{Bus, Command, Message, Reply, SecureChannel, Transport}
+  alias Jeff.{Bus, Command, Events, Message, Reply, SecureChannel, Transport}
 
   def start_link(opts \\ []) do
     GenServer.start_link(__MODULE__, opts)
@@ -122,13 +122,13 @@ defmodule Jeff.ControlPanel do
 
     if controlling_process do
       if reply.name == KEYPAD do
-        message = {:keypress, reply.address, reply.data}
-        send(controlling_process, message)
+        event = Events.Keypress.from_reply(reply)
+        send(controlling_process, event)
       end
 
       if reply.name == RAW do
-        message = {:raw, reply.address, reply.data}
-        send(controlling_process, message)
+        event = Events.CardRead.from_reply(reply)
+        send(controlling_process, event)
       end
     end
 
