@@ -7,7 +7,7 @@ defmodule Jeff.Bus do
             cursor: nil,
             poll: [],
             conn: nil,
-            handler: nil
+            controlling_process: nil
 
   def new(_opts \\ []) do
     %__MODULE__{}

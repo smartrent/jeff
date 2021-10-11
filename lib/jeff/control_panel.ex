@@ -2,7 +2,7 @@ defmodule Jeff.ControlPanel do
   require Logger
 
   use GenServer
-  alias Jeff.{Bus, Command, Message, Reply, SecureChannel, Transport}
+  alias Jeff.{Bus, Command, Events, Message, Reply, SecureChannel, Transport}
 
   def start_link(opts \\ []) do
     GenServer.start_link(__MODULE__, opts)
@@ -55,12 +55,12 @@ defmodule Jeff.ControlPanel do
 
   @impl GenServer
   def init(opts) do
-    handler = Keyword.get(opts, :handler)
+    controlling_process = Keyword.get(opts, :controlling_process)
     serial_port = Keyword.get(opts, :serial_port, "/dev/ttyUSB0")
     {:ok, conn} = Transport.start_link({serial_port, self(), opts})
 
     state = Bus.new()
-    state = %{state | conn: conn, handler: handler}
+    state = %{state | conn: conn, controlling_process: controlling_process}
 
     {:ok, tick(state)}
   end
@@ -86,7 +86,10 @@ defmodule Jeff.ControlPanel do
     {:noreply, tick(state)}
   end
 
-  def handle_info(:tick, %{command: command, reply: nil} = state) do
+  def handle_info(
+        :tick,
+        %{command: command, reply: nil, controlling_process: controlling_process} = state
+      ) do
     device = Bus.current_device(state)
 
     command_message = Message.new(device, command)
@@ -116,6 +119,18 @@ defmodule Jeff.ControlPanel do
       end
 
     reply = Reply.new(reply_message)
+
+    if controlling_process do
+      if reply.name == KEYPAD do
+        event = Events.Keypress.from_reply(reply)
+        send(controlling_process, event)
+      end
+
+      if reply.name == RAW do
+        event = Events.CardRead.from_reply(reply)
+        send(controlling_process, event)
+      end
+    end
 
     state = handle_reply(state, reply)
 
@@ -150,12 +165,6 @@ defmodule Jeff.ControlPanel do
     secure_channel = SecureChannel.establish(device.secure_channel, reply.data)
     device = %{device | secure_channel: secure_channel}
     Bus.put_device(state, device)
-  end
-
-  defp handle_reply(%{handler: {m, f, _a}} = state, %{name: name} = reply)
-       when name in [RAW, KEYPAD] do
-    apply(m, f, [reply])
-    state
   end
 
   defp handle_reply(state, _reply), do: state
