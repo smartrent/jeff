@@ -4,12 +4,12 @@ defmodule Jeff.Events.CardRead do
   """
 
   @type t :: %__MODULE__{
-    address: 0..127,
-    data: binary(),
-    format: non_neg_integer(),
-    length: non_neg_integer(),
-    reader: non_neg_integer()
-  }
+          address: 0..127,
+          data: binary(),
+          format: non_neg_integer(),
+          length: non_neg_integer(),
+          reader: non_neg_integer()
+        }
   defstruct ~w[address data format length reader]a
 
   alias Jeff.Reply
