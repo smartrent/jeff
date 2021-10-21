@@ -66,13 +66,19 @@ defmodule Jeff.Bus do
 
   # handle reply and reset
   def tick(%{reply: _reply} = bus) do
-    device = current_device(bus) |> Device.inc_sequence()
-    bus = register(bus, device)
+    bus = maybe_validate_reply(bus)
 
     # TODO: Convert sleep to part of functional core
     if bus.poll == [], do: Process.sleep(100)
 
     %{bus | command: nil, cursor: nil, reply: nil}
+  end
+
+  defp maybe_validate_reply(%{reply: :timeout} = bus), do: bus
+
+  defp maybe_validate_reply(bus) do
+    device = current_device(bus) |> Device.receive_valid_reply()
+    register(bus, device)
   end
 
   def send_command(bus, %{address: address} = command) do

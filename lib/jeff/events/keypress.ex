@@ -4,11 +4,11 @@ defmodule Jeff.Events.Keypress do
   """
 
   @type t :: %__MODULE__{
-    address: 0..127,
-    count: non_neg_integer(),
-    keys: binary(),
-    reader: non_neg_integer()
-  }
+          address: 0..127,
+          count: non_neg_integer(),
+          keys: binary(),
+          reader: non_neg_integer()
+        }
 
   defstruct ~w[address count keys reader]a
 

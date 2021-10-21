@@ -98,4 +98,29 @@ defmodule DeviceTest do
     assert {device, ^command2} = Device.next_command(device)
     assert {_device, ^poll_command} = Device.next_command(device)
   end
+
+  test "receiving a valid reply" do
+    device = Device.new()
+    assert device.sequence == 0
+    assert device.last_valid_reply == nil
+
+    # increment sqn, do not set last_valid_reply when incrementing from zero
+    device = Device.receive_valid_reply(device)
+    assert device.sequence == 1
+    assert device.last_valid_reply == nil
+
+    # increment sqn, set last_valid_reply when incrementing non-zero numbers
+    device = Device.receive_valid_reply(device)
+    assert device.sequence == 2
+    assert_in_delta device.last_valid_reply, System.monotonic_time(:millisecond), 100
+  end
+
+  test "online?" do
+    now = System.monotonic_time(:millisecond)
+    eight_secs = 8000
+
+    assert %Device{last_valid_reply: nil} |> Device.online?() == false
+    assert %Device{last_valid_reply: now} |> Device.online?() == true
+    assert %Device{last_valid_reply: now + eight_secs} |> Device.online?() == false
+  end
 end

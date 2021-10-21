@@ -4,6 +4,8 @@ defmodule Jeff.ControlPanel do
   use GenServer
   alias Jeff.{Bus, Command, Events, Message, Reply, SecureChannel, Transport}
 
+  @max_reply_delay 200
+
   def start_link(opts \\ []) do
     GenServer.start_link(__MODULE__, opts)
   end
@@ -57,7 +59,7 @@ defmodule Jeff.ControlPanel do
   def init(opts) do
     controlling_process = Keyword.get(opts, :controlling_process)
     serial_port = Keyword.get(opts, :serial_port, "/dev/ttyUSB0")
-    {:ok, conn} = Transport.start_link({serial_port, self(), opts})
+    {:ok, conn} = Transport.start_link(port: serial_port, speed: 9600)
 
     state = Bus.new()
     state = %{state | conn: conn, controlling_process: controlling_process}
@@ -86,19 +88,53 @@ defmodule Jeff.ControlPanel do
     {:noreply, tick(state)}
   end
 
-  def handle_info(
-        :tick,
-        %{command: command, reply: nil, controlling_process: controlling_process} = state
-      ) do
+  def handle_info(:tick, %{command: command, reply: nil, conn: conn} = state) do
     device = Bus.current_device(state)
-
-    command_message = Message.new(device, command)
-    device = command_message.device
-
-    {:ok, reply_message} = Transport.send_message(state.conn, command_message)
+    %{device: device, bytes: bytes} = Message.new(device, command)
 
     # save the device with the possibly updated secure channel
     state = Bus.put_device(state, device)
+
+    :ok = Transport.send(conn, bytes)
+    state = Transport.recv(conn, @max_reply_delay) |> handle_recv(state)
+
+    {:noreply, tick(state)}
+  end
+
+  # handle transport connected
+  def handle_info(:connected, state) do
+    {:noreply, state}
+  end
+
+  def handle_info(_, state) do
+    {:noreply, state}
+  end
+
+  # Helper functions
+
+  defp handle_reply(state, %{name: CCRYPT} = reply) do
+    device = Bus.current_device(state)
+    secure_channel = SecureChannel.initialize(device.secure_channel, reply.data)
+    device = %{device | secure_channel: secure_channel}
+    Bus.put_device(state, device)
+  end
+
+  defp handle_reply(state, %{name: RMAC_I} = reply) do
+    device = Bus.current_device(state)
+    secure_channel = SecureChannel.establish(device.secure_channel, reply.data)
+    device = %{device | secure_channel: secure_channel}
+    Bus.put_device(state, device)
+  end
+
+  defp handle_reply(state, _reply), do: state
+
+  defp handle_recv(
+         {:ok, bytes},
+         %{controlling_process: controlling_process, command: command} = state
+       ) do
+    reply_message = Message.decode(bytes)
+
+    device = Bus.current_device(state)
 
     state =
       if device.secure_channel.established? do
@@ -138,36 +174,12 @@ defmodule Jeff.ControlPanel do
       GenServer.reply(command.caller, reply)
     end
 
-    state = %{state | reply: reply}
-    {:noreply, tick(state)}
+    %{state | reply: reply}
   end
 
-  # handle transport connected
-  def handle_info(:connected, state) do
-    {:noreply, state}
+  defp handle_recv({:error, :timeout}, state) do
+    %{state | reply: :timeout}
   end
-
-  def handle_info(_, state) do
-    {:noreply, state}
-  end
-
-  # Helper functions
-
-  defp handle_reply(state, %{name: CCRYPT} = reply) do
-    device = Bus.current_device(state)
-    secure_channel = SecureChannel.initialize(device.secure_channel, reply.data)
-    device = %{device | secure_channel: secure_channel}
-    Bus.put_device(state, device)
-  end
-
-  defp handle_reply(state, %{name: RMAC_I} = reply) do
-    device = Bus.current_device(state)
-    secure_channel = SecureChannel.establish(device.secure_channel, reply.data)
-    device = %{device | secure_channel: secure_channel}
-    Bus.put_device(state, device)
-  end
-
-  defp handle_reply(state, _reply), do: state
 
   defp tick(bus) do
     send(self(), :tick)
