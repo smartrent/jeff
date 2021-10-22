@@ -7,7 +7,8 @@ defmodule Jeff.ControlPanel do
   @max_reply_delay 200
 
   def start_link(opts \\ []) do
-    GenServer.start_link(__MODULE__, opts)
+    {name, opts} = Keyword.pop(opts, :name)
+    GenServer.start_link(__MODULE__, opts, name: name)
   end
 
   def add_device(pid, address, opts \\ []) do
