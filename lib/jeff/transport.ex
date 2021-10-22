@@ -55,7 +55,8 @@ defmodule Jeff.Transport do
       :ok ->
         {:ok, s}
 
-      {:error, _} ->
+      {:error, reason} ->
+        Logger.error("Error while opening port \"#{port}\": #{describe(reason, port, uart)}")
         {:backoff, 1000, s}
     end
   end
@@ -110,5 +111,22 @@ defmodule Jeff.Transport do
 
   def handle_call(:close, from, s) do
     {:disconnect, {:close, from}, s}
+  end
+
+  defp describe(:enoent, _port, _uart), do: "the specified port couldn't be found"
+
+  defp describe(:eagain, port, uart),
+    do: "the port is already opened by another process: #{eagain_processes(port, uart)}"
+
+  defp describe(:eacces, _port, _uart), do: "permission was denied when opening the port"
+  defp describe(reason, _port, _uart), do: inspect(reason)
+
+  defp eagain_processes(port, uart) do
+    Circuits.UART.find_pids()
+    |> Enum.filter(fn {_pid, prt} -> Path.basename(prt) == Path.basename(port) end)
+    |> Enum.filter(fn {pid, _prt} -> pid != uart end)
+    |> Enum.map(fn {pid, _prt} -> pid end)
+    |> Enum.map(&inspect/1)
+    |> Enum.join(", ")
   end
 end
