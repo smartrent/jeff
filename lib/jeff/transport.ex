@@ -56,8 +56,7 @@ defmodule Jeff.Transport do
         {:ok, s}
 
       {:error, reason} when reason in [:enoent, :eagain] ->
-        log_connect_error(reason, port, uart)
-        {:stop, reason, s}
+        {:stop, describe_connect_error(reason, port, uart), s}
 
       {:error, reason} ->
         log_connect_error(reason, port, uart)
@@ -118,16 +117,19 @@ defmodule Jeff.Transport do
   end
 
   defp log_connect_error(reason, port, uart) do
-    Logger.error("Error while opening port \"#{port}\": #{describe(reason, port, uart)}")
+    description = describe_connect_error(reason, port, uart)
+    Logger.error( "Error while opening port \"#{port}\": #{description}")
   end
 
-  defp describe(:enoent, _port, _uart), do: "the specified port couldn't be found"
+  defp describe_connect_error(:enoent, _port, _uart), do: "the specified port couldn't be found"
 
-  defp describe(:eagain, port, uart),
+  defp describe_connect_error(:eagain, port, uart),
     do: "the port is already opened by another process: #{eagain_processes(port, uart)}"
 
-  defp describe(:eacces, _port, _uart), do: "permission was denied when opening the port"
-  defp describe(reason, _port, _uart), do: inspect(reason)
+  defp describe_connect_error(:eacces, _port, _uart),
+    do: "permission was denied when opening the port"
+
+  defp describe_connect_error(reason, _port, _uart), do: inspect(reason)
 
   defp eagain_processes(port, uart) do
     Circuits.UART.find_pids()
