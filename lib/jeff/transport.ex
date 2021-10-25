@@ -55,8 +55,12 @@ defmodule Jeff.Transport do
       :ok ->
         {:ok, s}
 
+      {:error, reason} when reason in [:enoent, :eagain] ->
+        log_connect_error(reason, port, uart)
+        {:stop, reason, s}
+
       {:error, reason} ->
-        Logger.error("Error while opening port \"#{port}\": #{describe(reason, port, uart)}")
+        log_connect_error(reason, port, uart)
         {:backoff, 1000, s}
     end
   end
@@ -111,6 +115,10 @@ defmodule Jeff.Transport do
 
   def handle_call(:close, from, s) do
     {:disconnect, {:close, from}, s}
+  end
+
+  defp log_connect_error(reason, port, uart) do
+    Logger.error("Error while opening port \"#{port}\": #{describe(reason, port, uart)}")
   end
 
   defp describe(:enoent, _port, _uart), do: "the specified port couldn't be found"
