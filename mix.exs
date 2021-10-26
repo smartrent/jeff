@@ -7,6 +7,8 @@ defmodule Jeff.MixProject do
       version: "0.1.0",
       elixir: "~> 1.12",
       start_permanent: Mix.env() == :prod,
+      description: description(),
+      package: package(),
       deps: deps(),
       elixirc_paths: elixirc_paths(Mix.env())
     ]
@@ -29,7 +31,20 @@ defmodule Jeff.MixProject do
       {:cerlc, "~> 0.2.0"},
       {:connection, "~> 1.1.0"},
       {:credo, "~> 1.5", only: [:dev, :test], runtime: false},
-      {:dialyxir, "~> 1.1", only: [:dev], runtime: false}
+      {:dialyxir, "~> 1.1", only: [:dev], runtime: false},
+      {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}
+    ]
+  end
+
+  defp description() do
+    "An Elixir implementation of the Open Supervised Device Protocol (OSDP)."
+  end
+
+  defp package() do
+    [
+      licenses: ["Proprietary"],
+      links: %{"GitHub" => "https://github.com/smartrent/jeff"},
+      organization: "smartrent"
     ]
   end
 end
