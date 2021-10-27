@@ -12,6 +12,8 @@ defmodule Jeff.Events.Keypress do
 
   defstruct ~w[address count keys reader]a
 
+  alias Jeff.Reply
+
   @spec from_reply(Reply.t()) :: t()
   def from_reply(reply) do
     %__MODULE__{
