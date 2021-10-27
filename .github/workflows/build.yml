@@ -31,5 +31,8 @@ jobs:
         if: steps.mix-cache.outputs.cache-hit != 'true'
         run: mix deps.get
 
+      - name: mix format --check-formatted
+        run: mix format --check-formatted
+
       - name: mix test
         run: mix test

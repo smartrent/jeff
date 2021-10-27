@@ -118,7 +118,7 @@ defmodule Jeff.Transport do
 
   defp log_connect_error(reason, port, uart) do
     description = describe_connect_error(reason, port, uart)
-    Logger.error( "Error while opening port \"#{port}\": #{description}")
+    Logger.error("Error while opening port \"#{port}\": #{description}")
   end
 
   defp describe_connect_error(:enoent, _port, _uart), do: "the specified port couldn't be found"
