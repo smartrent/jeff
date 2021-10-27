@@ -1,0 +1,35 @@
+name: build
+on: push
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os.runner }}
+    name: ${{ matrix.os.name }} / OTP ${{matrix.beam.otp}} / Elixir ${{matrix.beam.elixir}}
+    strategy:
+      matrix:
+        beam:
+          - { otp: '24', elixir: '1.12' }
+        os:
+          - name: Linux
+            runner: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: ${{ matrix.beam.otp }}
+          elixir-version: ${{ matrix.beam.elixir }}
+
+      - name: Retrieve Mix Dependencies Cache
+        uses: actions/cache@v1
+        id: mix-cache
+        with:
+          path: deps
+          key: ${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-mix-${{ hashFiles(format('{0}{1}', github.workspace, '/mix.lock')) }}
+
+      - name: Install Mix dependencies
+        if: steps.mix-cache.outputs.cache-hit != 'true'
+        run: mix deps.get
+
+      - name: mix test
+        run: mix test
