@@ -134,6 +134,8 @@ defmodule Jeff.Message do
     %{message | bytes: bytes <> data}
   end
 
+  defp maybe_add_mac(%{device: nil} = message), do: message
+
   defp maybe_add_mac(%{bytes: bytes, device: device} = message) do
     {secure_channel, mac} =
       if add_mac?(message) do
