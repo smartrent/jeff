@@ -2,9 +2,12 @@ defmodule Jeff.ControlPanel do
   require Logger
 
   use GenServer
-  alias Jeff.{Bus, Command, Events, Message, Reply, SecureChannel, Transport}
+  alias Jeff.{Bus, Command, Device, Events, Message, Reply, SecureChannel, Transport}
 
   @max_reply_delay 200
+
+  @type osdp_address :: 0x0..0x7F
+  @type address_availability :: :available | :registered | :timeout | :error
 
   def start_link(opts \\ []) do
     {name, opts} = Keyword.pop(opts, :name)
@@ -56,6 +59,14 @@ defmodule Jeff.ControlPanel do
     send_command(pid, address, ABORT)
   end
 
+  @doc """
+  Determine if a device is available to be registered on the bus.
+  """
+  @spec check_address(GenServer.server(), osdp_address()) :: address_availability()
+  def check_address(pid, address) do
+    GenServer.call(pid, {:check_address, address})
+  end
+
   @impl GenServer
   def init(opts) do
     controlling_process = Keyword.get(opts, :controlling_process)
@@ -74,6 +85,34 @@ defmodule Jeff.ControlPanel do
     command = Command.new(address, name, params)
     state = Bus.send_command(state, command)
     {:noreply, state}
+  end
+
+  @impl GenServer
+  def handle_call({:check_address, address}, _from, %{conn: conn} = state) do
+    status =
+      if Bus.registered?(state, address) do
+        :registered
+      else
+        device = Device.new(address: address)
+        command = Command.new(address, POLL)
+        %{bytes: bytes} = Message.new(device, command)
+        :ok = Transport.send(conn, bytes)
+
+        case Transport.recv(conn, @max_reply_delay) do
+          {:ok, bytes} ->
+            try do
+              Message.decode(bytes)
+              :available
+            rescue
+              _error -> :error
+            end
+
+          {:error, :timeout} ->
+            :timeout
+        end
+      end
+
+    {:reply, status, state}
   end
 
   @impl GenServer
