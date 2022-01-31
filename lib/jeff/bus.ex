@@ -22,6 +22,10 @@ defmodule Jeff.Bus do
     Map.fetch!(registry, address)
   end
 
+  def registered?(%{registry: registry}, address) do
+    is_map_key(registry, address)
+  end
+
   def put_device(%{cursor: cursor} = bus, device) do
     register(bus, cursor, device)
   end
