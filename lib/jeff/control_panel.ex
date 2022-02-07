@@ -23,6 +23,10 @@ defmodule Jeff.ControlPanel do
     GenServer.call(pid, {:send_command, address, name, params})
   end
 
+  def send_command_oob(pid, address, name, params \\ []) do
+    GenServer.call(pid, {:send_command_oob, address, name, params})
+  end
+
   def id_report(pid, address) do
     send_command(pid, address, ID)
   end
@@ -87,29 +91,41 @@ defmodule Jeff.ControlPanel do
     {:noreply, state}
   end
 
+  def handle_call({:send_command_oob, address, name, params}, _from, state) do
+    device = Device.new(address: address)
+    command = Command.new(address, name, params)
+    %{bytes: bytes} = Message.new(device, command)
+
+    resp =
+      case send_data_oob(state, address, bytes) do
+        {:error, _reason} = error -> error
+        {:ok, bytes} -> Message.decode(bytes) |> Reply.new()
+      end
+
+    {:reply, resp, state}
+  end
+
   @impl GenServer
-  def handle_call({:check_address, address}, _from, %{conn: conn} = state) do
+  def handle_call({:check_address, address}, _from, state) do
+    device = Device.new(address: address)
+    command = Command.new(address, POLL)
+    %{bytes: bytes} = Message.new(device, command)
+
     status =
-      if Bus.registered?(state, address) do
-        :registered
-      else
-        device = Device.new(address: address)
-        command = Command.new(address, POLL)
-        %{bytes: bytes} = Message.new(device, command)
-        :ok = Transport.send(conn, bytes)
+      case send_data_oob(state, address, bytes) do
+        {:error, :registered} ->
+          :registered
 
-        case Transport.recv(conn, @max_reply_delay) do
-          {:ok, bytes} ->
-            try do
-              Message.decode(bytes)
-              :available
-            rescue
-              _error -> :error
-            end
+        {:error, :timeout} ->
+          :timeout
 
-          {:error, :timeout} ->
-            :timeout
-        end
+        {:ok, bytes} ->
+          try do
+            Message.decode(bytes)
+            :available
+          rescue
+            _error -> :error
+          end
       end
 
     {:reply, status, state}
@@ -219,6 +235,15 @@ defmodule Jeff.ControlPanel do
 
   defp handle_recv({:error, :timeout}, state) do
     %{state | reply: :timeout}
+  end
+
+  defp send_data_oob(state, address, bytes) do
+    if Bus.registered?(state, address) do
+      {:error, :registered}
+    else
+      :ok = Transport.send(state.conn, bytes)
+      Transport.recv(state.conn, @max_reply_delay)
+    end
   end
 
   defp tick(bus) do
