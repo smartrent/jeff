@@ -1,10 +1,12 @@
 defmodule Jeff.MixProject do
   use Mix.Project
 
+  @version "0.2.0"
+
   def project do
     [
       app: :jeff,
-      version: "0.1.0",
+      version: @version,
       elixir: "~> 1.12",
       start_permanent: Mix.env() == :prod,
       description: description(),
