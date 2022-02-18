@@ -44,7 +44,7 @@ defmodule Jeff.MixProject do
 
   defp package() do
     [
-      licenses: ["Proprietary"],
+      licenses: ["Apache-2.0"],
       links: %{"GitHub" => "https://github.com/smartrent/jeff"},
       organization: "smartrent"
     ]
