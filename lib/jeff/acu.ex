@@ -1,4 +1,4 @@
-defmodule Jeff.ControlPanel do
+defmodule Jeff.ACU do
   require Logger
 
   use GenServer
@@ -9,14 +9,18 @@ defmodule Jeff.ControlPanel do
   @type osdp_address :: 0x0..0x7F
   @type address_availability :: :available | :registered | :timeout | :error
 
+  @type start_opt() ::
+          {:name, :atom}
+          | {:serial_port, String.t()}
+
+  @spec start_link([start_opt()]) :: GenServer.on_start()
   def start_link(opts \\ []) do
     {name, opts} = Keyword.pop(opts, :name)
     GenServer.start_link(__MODULE__, opts, name: name)
   end
 
   def add_device(pid, address, opts \\ []) do
-    opts = Keyword.merge(opts, address: address)
-    GenServer.call(pid, {:add_device, opts})
+    GenServer.call(pid, {:add_device, address, opts})
   end
 
   def send_command(pid, address, name, params \\ []) do
@@ -25,42 +29,6 @@ defmodule Jeff.ControlPanel do
 
   def send_command_oob(pid, address, name, params \\ []) do
     GenServer.call(pid, {:send_command_oob, address, name, params})
-  end
-
-  def id_report(pid, address) do
-    send_command(pid, address, ID)
-  end
-
-  def capabilities(pid, address) do
-    send_command(pid, address, CAP)
-  end
-
-  def local_status(pid, address) do
-    send_command(pid, address, LSTAT)
-  end
-
-  def input_status(pid, address) do
-    send_command(pid, address, ISTAT)
-  end
-
-  def set_led(pid, address, params) do
-    send_command(pid, address, LED, params)
-  end
-
-  def set_buzzer(pid, address, params) do
-    send_command(pid, address, BUZ, params)
-  end
-
-  def set_com(pid, address, params) do
-    send_command(pid, address, COMSET, params)
-  end
-
-  def set_key(pid, address, params) do
-    send_command(pid, address, KEYSET, params)
-  end
-
-  def abort(pid, address) do
-    send_command(pid, address, ABORT)
   end
 
   @doc """
@@ -132,8 +100,8 @@ defmodule Jeff.ControlPanel do
   end
 
   @impl GenServer
-  def handle_call({:add_device, opts}, _from, state) do
-    address = Keyword.fetch!(opts, :address)
+  def handle_call({:add_device, address, opts}, _from, state) do
+    opts = Keyword.merge(opts, address: address)
     state = Bus.add_device(state, opts)
     device = Bus.get_device(state, address)
     {:reply, device, state}
