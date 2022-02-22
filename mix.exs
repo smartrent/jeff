@@ -12,7 +12,8 @@ defmodule Jeff.MixProject do
       description: description(),
       package: package(),
       deps: deps(),
-      elixirc_paths: elixirc_paths(Mix.env())
+      elixirc_paths: elixirc_paths(Mix.env()),
+      docs: docs()
     ]
   end
 
@@ -40,6 +41,15 @@ defmodule Jeff.MixProject do
 
   defp description() do
     "An Elixir implementation of the Open Supervised Device Protocol (OSDP)."
+  end
+
+  defp docs() do
+    [
+      extras: ["README.md", "CHANGELOG.md"],
+      main: "readme",
+      source_ref: "v#{@version}",
+      source_url: "https://github.com/smartrent/jeff"
+    ]
   end
 
   defp package() do

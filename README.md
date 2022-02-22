@@ -2,12 +2,32 @@
 
 An Elixir implementation of the Open Supervised Device Protocol (OSDP).
 
+[Open Supervised Device Protocol](https://www.securityindustry.org/industry-standards/open-supervised-device-protocol)
+(OSDP) is an access control communications standard developed by the Security
+Industry Association (SIA).
+
+The OSDP standard describes the communication interface of one or more
+Peripheral Devices (PD) to an Access Control Unit (ACU). The specification
+describes the protocol implementation over a two-wire RS-485 multi-drop
+serial communication channel.
+
+OSDP Supports the control of components on a PD such as:
+- LED
+- Buzzer
+- Keypad
+- Output (GPIOs)
+- Input Control (GPIOs)
+- Displays
+- Device status (tamper, power, etc.)
+- Card Reader
+- Fingerprint Reader
+
 ## Example
 
-```
-{:ok, cp} = Jeff.ACU.start_link(serial_port: "/dev/ttyUSB0")
-Jeff.ACU.add_device(cp, 0x7F, check_scheme: :crc)
-Jeff.ACU.id_report(cp, 0x7F)
+```elixir
+{:ok, acu} = Jeff.start_acu(serial_port: "/dev/ttyUSB0")
+Jeff.add_pd(acu, 0x7F, check_scheme: :crc)
+Jeff.id_report(acu, 0x7F)
 ```
 
 ## License
