@@ -1,4 +1,6 @@
 defmodule Jeff.Message do
+  @moduledoc false
+
   alias Jeff.{ControlInfo, SecureChannel}
   import Jeff.ErrorChecks
 

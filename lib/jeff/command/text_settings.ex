@@ -1,4 +1,6 @@
 defmodule Jeff.Command.TextSettings do
+  @moduledoc false
+
   defstruct reader: 0x00,
             temporary?: false,
             wrap?: false,

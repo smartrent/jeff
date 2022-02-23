@@ -1,31 +1,34 @@
 defmodule Jeff.Reply do
   @moduledoc """
-  Name      | Code | Description                                  | Data Type
-  ACK       | 0x40 | Command accepted, nothing else to report     | -
-  NAK       | 0x41 | Command not processed                        | ErrorCode
-  PDID      | 0x45 | PD ID Report                                 | IdReport
-  PDCAP     | 0x46 | PD Capabilities Report                       | [Capability]
-  LSTATR    | 0x48 | Local Status Report                          | Report data
-  ISTATR    | 0x49 | Input Status Report                          | Report data
-  OSTATR    | 0x4A | Output Status Report                         | Report data
-  RSTATR    | 0x4B | Reader Status Report                         | Report data
-  RAW       | 0x50 | Reader Data – Raw bit image of card data     | CardData
-  FMT       | 0x51 | Reader Data – Formatted character stream     | Card data
-  KEYPAD    | 0x53 | Keypad Data                                  | KeypadData
-  COM       | 0x54 | PD Communications Configuration Report       | ComData
-  BIOREADR  | 0x57 | Biometric Data                               | Biometric data
-  BIOMATCHR | 0x58 | Biometric Match Result                       | Result
-  CCRYPT    | 0x76 | Client's ID, Random Number, and Cryptogram   | EncryptionClient
-  BUSY      | 0x79 | PD is Busy reply                             | -
-  RMAC_I    | 0x78 | Initial R-MAC                                | Encryption Data
-  FTSTAT    | 0x7A | File transfer status                         | Status details
-  PIVDATAR  | 0x80 | PIV Data Reply                               | credential data
-  GENAUTHR  | 0x81 | Authentication response                      | response details
-  CRAUTHR   | 0x82 | Response to challenge                        | response details
-  MFGSTATR  | 0x83 | MFG specific status                          | status details
-  MFGERRR   | 0x84 | MFG specific error                           | error details
-  MFGREP    | 0x90 | Manufacturer Specific Reply                  | Any
-  XRD       | 0xB1 | Extended Read Response                       | APDU and details
+  Replies are sent from a PD to an ACU in response to a command
+
+  | Name      | Code | Description                                | Data Type        |
+  |-----------|------|--------------------------------------------|------------------|
+  | ACK       | 0x40 | Command accepted, nothing else to report   | -                |
+  | NAK       | 0x41 | Command not processed                      | ErrorCode        |
+  | PDID      | 0x45 | PD ID Report                               | IdReport         |
+  | PDCAP     | 0x46 | PD Capabilities Report                     | [Capability]     |
+  | LSTATR    | 0x48 | Local Status Report                        | Report data      |
+  | ISTATR    | 0x49 | Input Status Report                        | Report data      |
+  | OSTATR    | 0x4A | Output Status Report                       | Report data      |
+  | RSTATR    | 0x4B | Reader Status Report                       | Report data      |
+  | RAW       | 0x50 | Reader Data – Raw bit image of card data   | CardData         |
+  | FMT       | 0x51 | Reader Data – Formatted character stream   | CardData         |
+  | KEYPAD    | 0x53 | Keypad Data                                | KeypadData       |
+  | COM       | 0x54 | PD Communications Configuration Report     | ComData          |
+  | BIOREADR  | 0x57 | Biometric Data                             | Biometric data   |
+  | BIOMATCHR | 0x58 | Biometric Match Result                     | Result           |
+  | CCRYPT    | 0x76 | Client's ID, Random Number, and Cryptogram | EncryptionClient |
+  | BUSY      | 0x79 | PD is Busy reply                           | -                |
+  | RMAC_I    | 0x78 | Initial R-MAC                              | Encryption Data  |
+  | FTSTAT    | 0x7A | File transfer status                       | Status details   |
+  | PIVDATAR  | 0x80 | PIV Data Reply                             | credential data  |
+  | GENAUTHR  | 0x81 | Authentication response                    | response details |
+  | CRAUTHR   | 0x82 | Response to challenge                      | response details |
+  | MFGSTATR  | 0x83 | MFG specific status                        | status details   |
+  | MFGERRR   | 0x84 | MFG specific error                         | error details    |
+  | MFGREP    | 0x90 | Manufacturer Specific Reply                | Any              |
+  | XRD       | 0xB1 | Extended Read Response                     | APDU and details |
   """
 
   use Bitwise
@@ -44,7 +47,7 @@ defmodule Jeff.Reply do
   @type t() :: %__MODULE__{
           address: byte(),
           code: byte(),
-          data: binary() | map(),
+          data: binary() | map() | list(),
           name: atom()
         }
 
@@ -108,9 +111,7 @@ defmodule Jeff.Reply do
     address &&& 0b01111111
   end
 
-  defp decode(_name, nil), do: nil
-  defp decode(_name, <<>>), do: nil
-  defp decode(ACK, _data), do: nil
+  defp decode(ACK, _data), do: Jeff.Reply.ACK
   defp decode(NAK, data), do: ErrorCode.decode(data)
   defp decode(PDID, data), do: IdReport.decode(data)
   defp decode(PDCAP, data), do: Capability.decode(data)
@@ -120,6 +121,8 @@ defmodule Jeff.Reply do
   defp decode(RAW, data), do: CardData.decode(data)
   defp decode(CCRYPT, data), do: EncryptionClient.decode(data)
   defp decode(RMAC_I, data), do: data
+  defp decode(_name, nil), do: nil
+  defp decode(_name, <<>>), do: nil
   defp decode(name, data), do: Module.concat(__MODULE__, name).decode(data)
 
   def code(name), do: @codes[name]

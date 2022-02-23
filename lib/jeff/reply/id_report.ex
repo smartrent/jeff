@@ -1,5 +1,19 @@
 defmodule Jeff.Reply.IdReport do
+  @moduledoc """
+  Device identification Report
+
+  OSDP v2.2 Specification Reference: 7.4
+  """
+
   defstruct [:vendor, :model, :version, :serial, :firmware]
+
+  @type t :: %__MODULE__{
+          firmware: String.t(),
+          model: integer(),
+          serial: String.t(),
+          vendor: String.t(),
+          version: integer()
+        }
 
   def decode(data) do
     <<

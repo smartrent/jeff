@@ -1,5 +1,18 @@
 defmodule Jeff.Reply.Capability do
+  @moduledoc """
+  Peripheral Device Capabilities Report
+
+  OSDP v2.2 Specification Reference: 7.5
+  """
+
   defstruct [:function, :compliance, :number_of, :description]
+
+  @type t :: %__MODULE__{
+          function: integer(),
+          compliance: integer(),
+          number_of: integer(),
+          description: String.t()
+        }
 
   @functions %{
     1 => "Contact Status Monitoring",
@@ -29,6 +42,7 @@ defmodule Jeff.Reply.Capability do
     }
   end
 
+  @spec decode(binary()) :: [t()]
   def decode(data) do
     do_decode(data, [])
   end

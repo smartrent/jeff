@@ -141,7 +141,7 @@ defmodule BusTest do
     poll_command = Command.new(0x01, POLL)
     ack_reply = Reply.new(0x01, ACK)
     id_command = Command.new(0x01, ID)
-    pdid_reply = Reply.new(0x01, PDID)
+    pdid_reply = Reply.new(0x01, PDID_TEST)
 
     bus = Bus.new()
     bus = Bus.add_device(bus, address: 0x01)

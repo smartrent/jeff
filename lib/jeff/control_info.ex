@@ -1,4 +1,6 @@
 defmodule Jeff.ControlInfo do
+  @moduledoc false
+
   def encode(%{sequence: seq, check_scheme: cs, security?: sec}) do
     encode(seq, cs, sec)
   end

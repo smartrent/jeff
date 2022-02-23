@@ -1,4 +1,6 @@
 defmodule Jeff.Reply.EncryptionClient do
+  @moduledoc false
+
   defstruct [:cuid, :rnd, :cryptogram]
 
   def decode(<<

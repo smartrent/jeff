@@ -4,7 +4,7 @@ defmodule Jeff.Events.Keypress do
   """
 
   @type t :: %__MODULE__{
-          address: 0..127,
+          address: Jeff.osdp_address(),
           count: non_neg_integer(),
           keys: binary(),
           reader: non_neg_integer()
