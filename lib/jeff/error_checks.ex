@@ -1,4 +1,6 @@
 defmodule Jeff.ErrorChecks do
+  @moduledoc false
+
   use Bitwise
 
   @spec crc(binary()) :: integer()

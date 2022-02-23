@@ -1,4 +1,6 @@
 defmodule Jeff.Bus do
+  @moduledoc false
+
   alias Jeff.Device
 
   defstruct registry: %{},

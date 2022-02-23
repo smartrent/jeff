@@ -1,4 +1,8 @@
 defmodule Jeff.ACU do
+  @moduledoc """
+  GenServer process for an ACU
+  """
+
   require Logger
 
   use GenServer
@@ -6,37 +10,56 @@ defmodule Jeff.ACU do
 
   @max_reply_delay 200
 
-  @type osdp_address :: 0x0..0x7F
+  @type acu() :: Jeff.acu()
   @type address_availability :: :available | :registered | :timeout | :error
+  @type osdp_address() :: Jeff.osdp_address()
 
   @type start_opt() ::
-          {:name, :atom}
+          {:name, atom()}
           | {:serial_port, String.t()}
 
+  @type device_opt() :: {:check_scheme, atom()}
+
+  @doc """
+  Start the ACU process.
+  """
   @spec start_link([start_opt()]) :: GenServer.on_start()
   def start_link(opts \\ []) do
     {name, opts} = Keyword.pop(opts, :name)
     GenServer.start_link(__MODULE__, opts, name: name)
   end
 
-  def add_device(pid, address, opts \\ []) do
-    GenServer.call(pid, {:add_device, address, opts})
+  @doc """
+  Register a peripheral device on the ACU communication bus.
+  """
+  @spec add_device(acu(), osdp_address(), [device_opt()]) :: Device.t()
+  def add_device(acu, address, opts \\ []) do
+    GenServer.call(acu, {:add_device, address, opts})
   end
 
-  def send_command(pid, address, name, params \\ []) do
-    GenServer.call(pid, {:send_command, address, name, params})
+  @doc """
+  Send a command to a peripheral device.
+  """
+  @spec send_command(acu(), osdp_address(), atom(), keyword()) :: Reply.t()
+  def send_command(acu, address, name, params \\ []) do
+    GenServer.call(acu, {:send_command, address, name, params})
   end
 
-  def send_command_oob(pid, address, name, params \\ []) do
-    GenServer.call(pid, {:send_command_oob, address, name, params})
+  @doc """
+  Send a command to a peripheral device that is not yet registered on the ACU.
+  Intended to be used for maintenance/diagnostic purposes.
+  """
+  @spec send_command_oob(acu(), osdp_address(), atom(), keyword()) :: Reply.t()
+  def send_command_oob(acu, address, name, params \\ []) do
+    GenServer.call(acu, {:send_command_oob, address, name, params})
   end
 
   @doc """
   Determine if a device is available to be registered on the bus.
   """
-  @spec check_address(GenServer.server(), osdp_address()) :: address_availability()
-  def check_address(pid, address) do
-    GenServer.call(pid, {:check_address, address})
+  @spec check_address(acu(), osdp_address()) :: address_availability()
+  def check_address(acu, address) do
+    GenServer.call(acu, {:check_address, address})
   end
 
   @impl GenServer

@@ -1,4 +1,6 @@
 defmodule Jeff.Command.EncryptionKey do
+  @moduledoc false
+
   @secure_channel_base_key 0x01
 
   defstruct [:key, type: @secure_channel_base_key]

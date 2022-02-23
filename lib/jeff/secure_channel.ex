@@ -1,4 +1,6 @@
 defmodule Jeff.SecureChannel do
+  @moduledoc false
+
   use Bitwise
 
   defstruct [

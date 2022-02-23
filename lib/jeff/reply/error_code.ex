@@ -1,5 +1,16 @@
 defmodule Jeff.Reply.ErrorCode do
+  @moduledoc """
+  Negative Acknowledge – Error Response
+
+  OSDP v2.2 Specification Reference: 7.3
+  """
+
   defstruct [:code, :description]
+
+  @type t :: %__MODULE__{
+          code: integer(),
+          description: String.t()
+        }
 
   @description %{
     0x00 => "No error",

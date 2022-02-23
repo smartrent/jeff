@@ -4,7 +4,7 @@ defmodule Jeff.Events.CardRead do
   """
 
   @type t :: %__MODULE__{
-          address: 0..127,
+          address: Jeff.osdp_address(),
           data: binary(),
           format: non_neg_integer(),
           length: non_neg_integer(),

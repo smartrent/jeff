@@ -5,12 +5,12 @@ defmodule ReplyTest do
 
   test "build a new reply from a message" do
     reply = Reply.new(%Message{address: 0x01, code: 0x40, data: nil})
-    assert %{code: 0x40, name: ACK, data: nil} = reply
+    assert %{code: 0x40, name: ACK, data: Jeff.Reply.ACK} = reply
   end
 
   test "build a new reply from module" do
     reply = Reply.new(0x01, ACK)
-    assert %{address: 0x01, code: 0x40, name: ACK, data: nil} = reply
+    assert %{address: 0x01, code: 0x40, name: ACK, data: Jeff.Reply.ACK} = reply
   end
 
   test "build a reply with an unknown code" do

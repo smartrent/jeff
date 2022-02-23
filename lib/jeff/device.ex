@@ -1,12 +1,13 @@
 defmodule Jeff.Device do
-  @moduledoc false
+  @moduledoc """
+  Peripheral Device configuration and handling
+  """
 
-  @type device_address :: 0..127
   @type check_scheme :: :checksum | :crc
   @type sequence_number :: 0..3
 
   @type t :: %__MODULE__{
-          address: device_address(),
+          address: Jeff.osdp_address(),
           check_scheme: check_scheme(),
           security?: boolean(),
           secure_channel: term(),

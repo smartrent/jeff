@@ -1,32 +1,35 @@
 defmodule Jeff.Command do
   @moduledoc """
-  Code | Name         | Description                           | Data Type
-  0x60 | POLL         | Poll                                  | -
-  0x61 | ID           | ID Report Request                     | -
-  0x62 | CAP          | PD Capabilities Request               | [Capability]
-  0x64 | LSTAT        | Local Status Report Request           | -
-  0x65 | ISTAT        | Input Status Report Request           | -
-  0x66 | OSTAT        | Output Status Report Request          | -
-  0x67 | RSTAT        | Reader Status Report Request          | -
-  0x68 | OUT          | Output Control Command                | OutputSettings
-  0x69 | LED          | Reader Led Control Command            | LedSettings
-  0x6A | BUZ          | Reader Buzzer Control Command         | BuzzerSettings
-  0x6B | TEXT         | Text Output Command                   | TextSettings
-  0x6E | COMSET       | PD Communication Config Command       | ComSettings
-  0x73 | BIOREAD      | Scan and Send Biometric Data          | Requested Return Format
-  0x74 | BIOMATCH     | Scan and Match Biometric Template     | Biometric Template
-  0x75 | KEYSET       | Encryption Key Set Command            | EncryptionKey
-  0x76 | CHLNG        | Challenge/Secure Session Init Request | ChallengeData
-  0x77 | SCRYPT       | Server Cryptogram                     | EncryptionData
-  0x7B | ACURXSIZE    | Max ACU receive size                  | Buffer size
-  0x7C | FILETRANSFER | Send data file to PD                  | File contents
-  0x80 | MFG          | Manufacturer Specific Command         | Any
-  0xA1 | XWR          | Extended write data                   | APDU and details
-  0xA2 | ABORT        | Abort PD operation                    | -
-  0xA3 | PIVDATA      | Get PIV Data                          | Object details
-  0xA4 | GENAUTH      | Request Authenticate                  | Request details
-  0xA5 | CRAUTH       | Request Crypto Response               | Challenge details
-  0xA7 | KEEPACTIVE   | PD read activation                    | Time duration
+  Commands are sent from an ACU to a PD
+
+  | Code | Name         | Description                           | Data Type               |
+  |------|--------------|---------------------------------------|-------------------------|
+  | 0x60 | POLL         | Poll                                  | -                       |
+  | 0x61 | ID           | ID Report Request                     | -                       |
+  | 0x62 | CAP          | PD Capabilities Request               | [Capability]            |
+  | 0x64 | LSTAT        | Local Status Report Request           | -                       |
+  | 0x65 | ISTAT        | Input Status Report Request           | -                       |
+  | 0x66 | OSTAT        | Output Status Report Request          | -                       |
+  | 0x67 | RSTAT        | Reader Status Report Request          | -                       |
+  | 0x68 | OUT          | Output Control Command                | OutputSettings          |
+  | 0x69 | LED          | Reader Led Control Command            | LedSettings             |
+  | 0x6A | BUZ          | Reader Buzzer Control Command         | BuzzerSettings          |
+  | 0x6B | TEXT         | Text Output Command                   | TextSettings            |
+  | 0x6E | COMSET       | PD Communication Config Command       | ComSettings             |
+  | 0x73 | BIOREAD      | Scan and Send Biometric Data          | Requested Return Format |
+  | 0x74 | BIOMATCH     | Scan and Match Biometric Template     | Biometric Template      |
+  | 0x75 | KEYSET       | Encryption Key Set Command            | EncryptionKey           |
+  | 0x76 | CHLNG        | Challenge/Secure Session Init Request | ChallengeData           |
+  | 0x77 | SCRYPT       | Server Cryptogram                     | EncryptionData          |
+  | 0x7B | ACURXSIZE    | Max ACU receive size                  | Buffer size             |
+  | 0x7C | FILETRANSFER | Send data file to PD                  | File contents           |
+  | 0x80 | MFG          | Manufacturer Specific Command         | Any                     |
+  | 0xA1 | XWR          | Extended write data                   | APDU and details        |
+  | 0xA2 | ABORT        | Abort PD operation                    | -                       |
+  | 0xA3 | PIVDATA      | Get PIV Data                          | Object details          |
+  | 0xA4 | GENAUTH      | Request Authenticate                  | Request details         |
+  | 0xA5 | CRAUTH       | Request Crypto Response               | Challenge details       |
+  | 0xA7 | KEEPACTIVE   | PD read activation                    | Time duration           |
   """
 
   @type t() :: %__MODULE__{
