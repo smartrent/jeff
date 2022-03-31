@@ -17,6 +17,7 @@ defmodule Jeff.ACU do
   @type start_opt() ::
           {:name, atom()}
           | {:serial_port, String.t()}
+          | {:controlling_process, Process.dest()}
 
   @type device_opt() :: {:check_scheme, atom()}
 
