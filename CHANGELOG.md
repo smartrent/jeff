@@ -1,3 +1,9 @@
+## [v0.3.1] - 2022-03-31
+
+### Changed
+
+- Add controlling_process to ACU start opt type
+
 ## [v0.3.0] - 2022-03-09
 
 ### Changed
