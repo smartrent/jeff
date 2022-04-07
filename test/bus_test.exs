@@ -11,6 +11,20 @@ defmodule BusTest do
     assert Bus.get_device(bus, address).address == address
   end
 
+  test "removing a device" do
+    address = 0x23
+    bus = Bus.new()
+
+    bus = Bus.add_device(bus, address: address)
+    bus = Bus.tick(bus)
+    assert address in bus.poll
+    assert Bus.registered?(bus, address)
+
+    bus = Bus.remove_device(bus, address)
+    refute address in bus.poll
+    refute Bus.registered?(bus, address)
+  end
+
   test "registered?" do
     address = 0x23
     bus = Bus.new()
