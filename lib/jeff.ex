@@ -26,6 +26,14 @@ defmodule Jeff do
   end
 
   @doc """
+  Remove a peripheral device from the ACU communication bus.
+  """
+  @spec remove_pd(acu(), osdp_address()) :: Device.t()
+  def remove_pd(acu, address) do
+    ACU.remove_device(acu, address)
+  end
+
+  @doc """
   Requests the return of the PD ID Report.
   """
   @spec id_report(acu(), osdp_address()) :: Reply.IdReport.t() | Reply.ErrorCode.t()

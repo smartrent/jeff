@@ -20,6 +20,12 @@ defmodule Jeff.Bus do
     _bus = register(bus, device.address, device)
   end
 
+  def remove_device(%{poll: poll, registry: registry} = bus, address) do
+    registry = Map.delete(registry, address)
+    poll = Enum.reject(poll, &(&1 == address))
+    %{bus | poll: poll, registry: registry}
+  end
+
   def get_device(%{registry: registry}, address) do
     Map.fetch!(registry, address)
   end

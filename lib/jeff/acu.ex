@@ -39,6 +39,14 @@ defmodule Jeff.ACU do
   end
 
   @doc """
+  Remove a peripheral device from the ACU communication bus.
+  """
+  @spec remove_device(acu(), osdp_address()) :: Device.t()
+  def remove_device(acu, address) do
+    GenServer.call(acu, {:remove_device, address})
+  end
+
+  @doc """
   Send a command to a peripheral device.
   """
   @spec send_command(acu(), osdp_address(), atom(), keyword()) :: Reply.t()
@@ -128,6 +136,12 @@ defmodule Jeff.ACU do
     opts = Keyword.merge(opts, address: address)
     state = Bus.add_device(state, opts)
     device = Bus.get_device(state, address)
+    {:reply, device, state}
+  end
+
+  def handle_call({:remove_device, address}, _from, state) do
+    device = Bus.get_device(state, address)
+    state = Bus.remove_device(state, address)
     {:reply, device, state}
   end
 
