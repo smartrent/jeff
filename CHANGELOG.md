@@ -1,3 +1,9 @@
+## [v0.3.2] - 2022-04-13
+
+### Added
+
+- Support removal of peripheral devices from ACU bus
+
 ## [v0.3.1] - 2022-03-31
 
 ### Changed
