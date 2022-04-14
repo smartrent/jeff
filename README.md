@@ -1,4 +1,4 @@
-# Jeff
+<img src="./assets/logo.svg" alt="Jeff logo" width="322">
 
 An Elixir implementation of the Open Supervised Device Protocol (OSDP).
 

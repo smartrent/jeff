@@ -47,6 +47,7 @@ defmodule Jeff.MixProject do
     [
       extras: ["README.md", "CHANGELOG.md"],
       main: "readme",
+      logo: "assets/logo-simple.png",
       source_ref: "v#{@version}",
       source_url: "https://github.com/smartrent/jeff"
     ]
