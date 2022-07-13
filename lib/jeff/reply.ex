@@ -34,7 +34,7 @@ defmodule Jeff.Reply do
   use Bitwise
 
   alias Jeff.Reply.{
-    Capability,
+    Capabilities,
     CardData,
     ComData,
     EncryptionClient,
@@ -114,7 +114,7 @@ defmodule Jeff.Reply do
   defp decode(ACK, _data), do: Jeff.Reply.ACK
   defp decode(NAK, data), do: ErrorCode.decode(data)
   defp decode(PDID, data), do: IdReport.decode(data)
-  defp decode(PDCAP, data), do: Capability.decode(data)
+  defp decode(PDCAP, data), do: Capabilities.decode(data)
   defp decode(LSTATR, data), do: LocalStatus.decode(data)
   defp decode(COM, data), do: ComData.decode(data)
   defp decode(KEYPAD, data), do: KeypadData.decode(data)

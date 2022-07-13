@@ -45,7 +45,7 @@ defmodule Jeff do
   Requests the PD to return a list of its functional capabilities, such as the
   type and number of input points, outputs points, reader ports, etc.
   """
-  @spec capabilities(acu(), osdp_address()) :: [Reply.Capability.t()] | Reply.ErrorCode.t()
+  @spec capabilities(acu(), osdp_address()) :: Reply.Capabilities.t() | Reply.ErrorCode.t()
   def capabilities(acu, address) do
     ACU.send_command(acu, address, CAP).data
   end
