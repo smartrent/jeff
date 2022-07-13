@@ -48,6 +48,7 @@ defmodule Jeff.Command do
     ComSettings,
     EncryptionKey,
     EncryptionServer,
+    FileTransfer,
     LedSettings,
     OutputSettings,
     TextSettings
@@ -117,6 +118,7 @@ defmodule Jeff.Command do
   defp encode(KEYSET, params), do: EncryptionKey.encode(params)
   defp encode(CHLNG, params), do: ChallengeData.encode(params)
   defp encode(SCRYPT, params), do: EncryptionServer.encode(params)
+  defp encode(FILETRANSFER, params), do: FileTransfer.encode(params)
   defp encode(ACURXSIZE, size: size), do: <<size::size(16)-little>>
   defp encode(ABORT, _params), do: nil
 
