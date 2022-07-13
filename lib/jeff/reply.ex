@@ -47,7 +47,7 @@ defmodule Jeff.Reply do
   @type t() :: %__MODULE__{
           address: byte(),
           code: byte(),
-          data: binary() | map() | list(),
+          data: any(),
           name: atom()
         }
 

@@ -25,7 +25,7 @@ defmodule Jeff.Reply.LocalStatus do
     }
   end
 
-  @spec decode(binary()) :: t()
+  @spec decode(<<_::16>>) :: t()
   def decode(<<tamper, power>>) do
     __MODULE__.new(tamper, power)
   end

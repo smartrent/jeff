@@ -61,7 +61,7 @@ defmodule Jeff do
   @doc """
   Controls the LEDs associated with one or more readers.
   """
-  @spec set_led(acu(), osdp_address(), Command.LedSettings.params()) ::
+  @spec set_led(acu(), osdp_address(), [Command.LedSettings.param()]) ::
           Reply.ACK | Reply.ErrorCode.t()
   def set_led(acu, address, params) do
     ACU.send_command(acu, address, LED, params).data
@@ -71,7 +71,7 @@ defmodule Jeff do
   Defines commands to a single, monotone audible annunciator (beeper or buzzer)
   that may be associated with a reader.
   """
-  @spec set_buzzer(acu(), osdp_address(), Command.BuzzerSettings.params()) ::
+  @spec set_buzzer(acu(), osdp_address(), [Command.BuzzerSettings.param()]) ::
           Reply.ACK | Reply.ErrorCode.t()
   def set_buzzer(acu, address, params) do
     ACU.send_command(acu, address, BUZ, params).data
@@ -80,7 +80,7 @@ defmodule Jeff do
   @doc """
   Sets the PD's communication parameters.
   """
-  @spec set_com(acu(), osdp_address(), Command.ComSettings.params()) ::
+  @spec set_com(acu(), osdp_address(), [Command.ComSettings.param()]) ::
           Reply.ComData.t() | Reply.ErrorCode.t()
   def set_com(acu, address, params) do
     ACU.send_command(acu, address, COMSET, params).data

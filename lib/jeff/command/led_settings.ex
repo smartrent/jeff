@@ -48,43 +48,42 @@ defmodule Jeff.Command.LedSettings do
             perm_off_color: 0x00
 
   @type t :: %__MODULE__{
-          reader: integer(),
-          led: integer(),
+          reader: pos_integer(),
+          led: pos_integer(),
           temp_mode: 0x00 | 0x01 | 0x02,
-          temp_on_time: integer(),
-          temp_off_time: integer(),
+          temp_on_time: pos_integer(),
+          temp_off_time: pos_integer(),
           temp_on_color: 0x00..0x07,
           temp_off_color: 0x00..0x07,
-          temp_timer: integer(),
+          temp_timer: pos_integer(),
           perm_mode: 0x00 | 0x01,
-          perm_on_time: integer(),
-          perm_off_time: integer(),
+          perm_on_time: pos_integer(),
+          perm_off_time: pos_integer(),
           perm_on_color: 0x00..0x07,
           perm_off_color: 0x00..0x07
         }
 
   @type param() ::
-          {:reader, integer()}
-          | {:led, integer()}
+          {:reader, pos_integer()}
+          | {:led, pos_integer()}
           | {:temp_mode, 0x00 | 0x01 | 0x02}
-          | {:temp_on_time, integer()}
-          | {:temp_off_time, integer()}
+          | {:temp_on_time, pos_integer()}
+          | {:temp_off_time, pos_integer()}
           | {:temp_on_color, 0x00..0x07}
           | {:temp_off_color, 0x00..0x07}
-          | {:temp_timer, integer()}
+          | {:temp_timer, pos_integer()}
           | {:perm_mode, 0x00 | 0x01}
-          | {:perm_on_time, integer()}
-          | {:perm_off_time, integer()}
+          | {:perm_on_time, pos_integer()}
+          | {:perm_off_time, pos_integer()}
           | {:perm_on_color, 0x00..0x07}
           | {:perm_off_color, 0x00..0x07}
-  @type params() :: t() | [param()]
 
-  @spec new(params()) :: t()
+  @spec new([param()]) :: t()
   def new(params) do
     struct(__MODULE__, params)
   end
 
-  @spec encode(params()) :: binary()
+  @spec encode([param()]) :: <<_::112>>
   def encode(params) do
     settings = new(params)
 

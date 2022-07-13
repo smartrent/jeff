@@ -12,6 +12,7 @@ defmodule Jeff.MixProject do
       description: description(),
       package: package(),
       deps: deps(),
+      dialyzer: dialyzer(),
       elixirc_paths: elixirc_paths(Mix.env()),
       docs: docs()
     ]
@@ -41,6 +42,13 @@ defmodule Jeff.MixProject do
 
   defp description() do
     "An Elixir implementation of the Open Supervised Device Protocol (OSDP)."
+  end
+
+  defp dialyzer() do
+    [
+      flags: [:missing_return, :extra_return, :unmatched_returns, :error_handling, :underspecs],
+      list_unused_filters: true
+    ]
   end
 
   defp docs() do
