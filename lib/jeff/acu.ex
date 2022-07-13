@@ -121,7 +121,7 @@ defmodule Jeff.ACU do
 
         {:ok, bytes} ->
           try do
-            Message.decode(bytes)
+            _ = Message.decode(bytes)
             :available
           rescue
             _error -> :error

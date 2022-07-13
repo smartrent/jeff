@@ -52,14 +52,13 @@ defmodule Jeff.Command.BuzzerSettings do
           | {:on_time, on_time()}
           | {:off_time, off_time()}
           | {:count, count()}
-  @type params :: t() | [param()]
 
-  @spec new(params()) :: t()
+  @spec new([param()]) :: t()
   def new(params \\ []) do
     struct(__MODULE__, params)
   end
 
-  @spec encode(params()) :: binary()
+  @spec encode([param()]) :: <<_::40>>
   def encode(params) do
     settings = new(params)
 

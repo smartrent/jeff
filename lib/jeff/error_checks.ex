@@ -3,13 +3,13 @@ defmodule Jeff.ErrorChecks do
 
   use Bitwise
 
-  @spec crc(binary()) :: integer()
+  @spec crc(binary()) :: pos_integer()
   def crc(data) when is_binary(data) do
     crc_defn = :cerlc.init(:crc16_aug_ccitt)
     :cerlc.calc_crc(data, crc_defn)
   end
 
-  @spec checksum(binary()) :: integer()
+  @spec checksum(binary()) :: pos_integer()
   def checksum(data) when is_binary(data) do
     <<i <- data>>
     |> for(do: i)

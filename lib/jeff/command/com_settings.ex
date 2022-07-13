@@ -18,14 +18,13 @@ defmodule Jeff.Command.ComSettings do
   @type param() ::
           {:address, Jeff.osdp_address()}
           | {:baud, baud()}
-  @type params :: t() | [param()]
 
-  @spec new(params()) :: t()
+  @spec new([param()]) :: t()
   def new(params \\ []) do
     struct(__MODULE__, params)
   end
 
-  @spec encode(params()) :: binary()
+  @spec encode([param()]) :: <<_::40>>
   def encode(params) do
     %{address: address, baud: baud} = new(params)
     <<address, baud::size(4)-unit(8)-little>>
