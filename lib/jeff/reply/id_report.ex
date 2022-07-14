@@ -15,6 +15,7 @@ defmodule Jeff.Reply.IdReport do
           version: integer()
         }
 
+  @spec decode(<<_::96>>) :: t()
   def decode(data) do
     <<
       vendor1,

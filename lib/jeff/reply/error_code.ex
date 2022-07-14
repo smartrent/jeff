@@ -25,10 +25,12 @@ defmodule Jeff.Reply.ErrorCode do
     0x09 => "Unable to process command record"
   }
 
+  @spec new(0..9) :: t()
   def new(code) do
     %__MODULE__{code: code, description: description(code)}
   end
 
+  @spec decode(<<_::8>>) :: t()
   def decode(<<code>>), do: new(code)
 
   defp description(code), do: @description[code]

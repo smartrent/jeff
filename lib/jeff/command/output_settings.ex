@@ -17,6 +17,7 @@ defmodule Jeff.Command.OutputSettings do
   | 0x06 | Set the temporary state to OFF, resume permanent state on timeout |
   """
 
+  @spec encode(output: pos_integer(), code: pos_integer(), timer: pos_integer()) :: <<_::32>>
   def encode(output: output, code: code, timer: timer) do
     <<output, code, timer::size(2)-unit(8)-little>>
   end

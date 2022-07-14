@@ -23,12 +23,15 @@ defmodule Jeff.Message do
     :device
   ]
 
-  @spec new(keyword()) :: %__MODULE__{}
+  @type t :: %Jeff.Message{}
+
+  @spec new(keyword()) :: t()
   def new(options \\ []) do
     struct(__MODULE__, options)
     |> encode()
   end
 
+  @spec new(Jeff.Device.t(), Jeff.Command.t()) :: t()
   def new(device, command) do
     security? = if device.sequence == 0, do: false, else: device.security?
 
@@ -78,6 +81,7 @@ defmodule Jeff.Message do
     |> add_check()
   end
 
+  @spec type(t() | Jeff.osdp_address()) :: :reply | :command
   def type(%{address: address} = _message), do: type(address)
 
   def type(address) when is_integer(address) do
@@ -85,6 +89,8 @@ defmodule Jeff.Message do
     if reply? == 1, do: :reply, else: :command
   end
 
+  @spec scs(Jeff.osdp_address(), byte(), boolean()) ::
+          0x11 | 0x12 | 0x13 | 0x14 | 0x17 | 0x18 | nil
   def scs(address, code, sc_established?) do
     do_scs(type(address), code, sc_established?)
   end
@@ -156,7 +162,7 @@ defmodule Jeff.Message do
 
   defp add_mac?(_message), do: false
 
-  def mac_size(message), do: if(add_mac?(message), do: 4, else: 0)
+  defp mac_size(message), do: if(add_mac?(message), do: 4, else: 0)
 
   defp calculate_message_length(%{bytes: bytes} = message) do
     packet_length = byte_size(bytes) + check_size(message) + mac_size(message)
@@ -165,6 +171,7 @@ defmodule Jeff.Message do
     %{message | bytes: bytes, length: packet_length}
   end
 
+  @spec check_size(t()) :: 1 | 2
   def check_size(%{check_scheme: check_scheme}) do
     do_check_size(check_scheme)
   end
@@ -182,22 +189,36 @@ defmodule Jeff.Message do
     %{message | bytes: bytes <> <<check::size(16)-little>>, check: check}
   end
 
-  @spec decode(binary()) :: %__MODULE__{}
+  @spec decode(nonempty_binary()) :: %__MODULE__{
+          :address => byte(),
+          :bytes => nonempty_binary(),
+          :check => pos_integer(),
+          :check_scheme => :checksum | :crc,
+          :code => byte(),
+          :data => binary(),
+          :device => nil,
+          :length => pos_integer(),
+          :mac => nil | <<_::32>>,
+          :sb_data => nil | binary(),
+          :sb_type => nil | byte(),
+          :security? => nil | boolean(),
+          :sequence => 0..3
+        }
   def decode(<<@som, rest::binary>> = bytes) do
     do_decode(rest, %__MODULE__{bytes: bytes})
   end
 
-  def do_decode(bytes, %{address: nil} = message) do
+  defp do_decode(bytes, %{address: nil} = message) do
     <<address, rest::binary>> = bytes
     do_decode(rest, %{message | address: address})
   end
 
-  def do_decode(bytes, %{length: nil} = message) do
+  defp do_decode(bytes, %{length: nil} = message) do
     <<length::size(16)-little, rest::binary>> = bytes
     do_decode(rest, %{message | length: length})
   end
 
-  def do_decode(bytes, %{sequence: nil} = message) do
+  defp do_decode(bytes, %{sequence: nil} = message) do
     <<control_byte, rest::binary>> = bytes
 
     {sequence, check_scheme, security?} = ControlInfo.decode(control_byte)
@@ -207,7 +228,7 @@ defmodule Jeff.Message do
     do_decode(rest, message)
   end
 
-  def do_decode(bytes, %{security?: true, sb_type: nil} = message) do
+  defp do_decode(bytes, %{security?: true, sb_type: nil} = message) do
     sb_len = :binary.at(bytes, 0)
     <<sb::binary-size(sb_len), rest::binary>> = bytes
     <<_sb_len, sb_type, sb_data::binary>> = sb
@@ -215,32 +236,33 @@ defmodule Jeff.Message do
     do_decode(rest, message)
   end
 
-  def do_decode(bytes, %{code: nil} = message) do
+  defp do_decode(bytes, %{code: nil} = message) do
     <<code, rest::binary>> = bytes
     do_decode(rest, %{message | code: code})
   end
 
-  def do_decode(bytes, %{data: nil} = message) do
+  defp do_decode(bytes, %{data: nil} = message) do
     data_size = byte_size(bytes) - check_size(message) - mac_size(message)
 
     <<data::binary-size(data_size), rest::binary>> = bytes
     do_decode(rest, %{message | data: data})
   end
 
-  def do_decode(bytes, %{mac: nil, sb_type: sb_type} = message) when sb_type in @mac_sb_types do
+  defp do_decode(bytes, %{mac: nil, sb_type: sb_type} = message) when sb_type in @mac_sb_types do
     <<mac::binary-size(4), rest::binary>> = bytes
     do_decode(rest, %{message | mac: mac})
   end
 
-  def do_decode(bytes, %{check_scheme: :checksum} = message) do
+  defp do_decode(bytes, %{check_scheme: :checksum} = message) do
     <<check::size(8)-little>> = bytes
     %{message | check: check}
   end
 
-  def do_decode(bytes, %{check_scheme: :crc} = message) do
+  defp do_decode(bytes, %{check_scheme: :crc} = message) do
     <<check::size(16)-little>> = bytes
     %{message | check: check}
   end
 
+  @spec start_of_message() :: 0x53
   def start_of_message(), do: @som
 end
