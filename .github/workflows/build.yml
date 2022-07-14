@@ -13,19 +13,20 @@ jobs:
           - name: Linux
             runner: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - uses: erlef/setup-beam@v1
         with:
           otp-version: ${{ matrix.beam.otp }}
           elixir-version: ${{ matrix.beam.elixir }}
+          version-type: strict
 
       - name: Retrieve Mix Dependencies Cache
-        uses: actions/cache@v1
+        uses: actions/cache@v3
         id: mix-cache
         with:
           path: deps
-          key: ${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-mix-${{ hashFiles(format('{0}{1}', github.workspace, '/mix.lock')) }}
+          key: ${{ runner.os }}-${{ matrix.beam.otp }}-${{ matrix.beam.elixir }}-mix-${{ hashFiles(format('{0}{1}', github.workspace, '/mix.lock')) }}
 
       - name: Install Mix dependencies
         if: steps.mix-cache.outputs.cache-hit != 'true'
