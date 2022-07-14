@@ -1,8 +1,8 @@
 defmodule SecureChannelTest do
   use ExUnit.Case
 
-  alias Jeff.SecureChannel, as: SC
   alias Jeff.Reply.EncryptionClient
+  alias Jeff.SecureChannel, as: SC
 
   test "starting a secure channel" do
     sc = SC.new()

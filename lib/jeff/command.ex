@@ -45,9 +45,9 @@ defmodule Jeff.Command do
   alias Jeff.Command.{
     BuzzerSettings,
     ChallengeData,
-    EncryptionServer,
     ComSettings,
     EncryptionKey,
+    EncryptionServer,
     LedSettings,
     OutputSettings,
     TextSettings
