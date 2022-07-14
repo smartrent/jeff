@@ -28,7 +28,7 @@ defmodule Jeff.Reply.IdReport do
       fw_build
     >> = data
 
-    vendor = [vendor1, vendor2, vendor3] |> Enum.map(&hex/1) |> Enum.join()
+    vendor = [vendor1, vendor2, vendor3] |> Enum.map_join(&hex/1)
     serial = hex(serial) |> String.pad_leading(8, "0")
     firmware = "#{fw_major}.#{fw_minor}.#{fw_build}"
 

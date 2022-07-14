@@ -34,6 +34,9 @@ jobs:
       - name: mix format --check-formatted
         run: mix format --check-formatted
 
+      - name: mix credo
+        run: mix credo
+
       - name: mix dialyzer
         run: mix dialyzer
 

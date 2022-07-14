@@ -242,5 +242,5 @@ defmodule Jeff.Message do
     %{message | check: check}
   end
 
-  def start_of_message, do: @som
+  def start_of_message(), do: @som
 end

@@ -132,11 +132,12 @@ defmodule Jeff.Transport do
   defp describe_connect_error(reason, _port, _uart), do: inspect(reason)
 
   defp eagain_processes(port, uart) do
-    Circuits.UART.find_pids()
-    |> Enum.filter(fn {_pid, prt} -> Path.basename(prt) == Path.basename(port) end)
-    |> Enum.filter(fn {pid, _prt} -> pid != uart end)
-    |> Enum.map(fn {pid, _prt} -> pid end)
-    |> Enum.map(&inspect/1)
+    for(
+      {pid, prt} <- Circuits.UART.find_pids(),
+      Path.basename(prt) == Path.basename(port),
+      pid != uart,
+      do: inspect(pid)
+    )
     |> Enum.join(", ")
   end
 end
