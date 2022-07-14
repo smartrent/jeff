@@ -10,11 +10,13 @@ defmodule Jeff.Command.TextSettings do
             length: 0x00,
             content: ""
 
+  @spec new(keyword()) :: %__MODULE__{}
   def new(params \\ []) do
     settings = struct(__MODULE__, params)
     %{settings | length: byte_size(settings.content)}
   end
 
+  @spec encode(keyword()) :: <<_::48>>
   def encode(params) do
     settings = new(params)
 

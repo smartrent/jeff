@@ -7,6 +7,13 @@ defmodule Jeff.Reply.KeypadData do
 
   defstruct [:reader, :count, :keys]
 
+  @type t :: %__MODULE__{
+          reader: byte(),
+          count: pos_integer(),
+          keys: binary()
+        }
+
+  @spec decode(binary()) :: t()
   def decode(<<reader, count, keys::binary>>) do
     %__MODULE__{reader: reader, count: count, keys: keys}
   end

@@ -28,6 +28,7 @@ defmodule Jeff.Device do
 
   @offline_threshold_ms 8000
 
+  @spec new(keyword()) :: t()
   def new(params \\ []) do
     secure_channel = SecureChannel.new()
 
@@ -36,6 +37,7 @@ defmodule Jeff.Device do
     |> Map.put(:secure_channel, secure_channel)
   end
 
+  @spec inc_sequence(t()) :: t()
   def inc_sequence(%{sequence: n} = device) do
     %{device | sequence: next_sequence(n)}
   end
@@ -53,17 +55,20 @@ defmodule Jeff.Device do
 
   defp next_sequence(n), do: rem(n, 3) + 1
 
+  @spec online?(t()) :: boolean()
   def online?(%{last_valid_reply: nil}), do: false
 
   def online?(%{last_valid_reply: last_valid_reply}) do
     last_valid_reply - System.monotonic_time(:millisecond) < @offline_threshold_ms
   end
 
+  @spec send_command(t(), Command.t()) :: t()
   def send_command(%{commands: commands} = device, command) do
     commands = :queue.in(command, commands)
     %{device | commands: commands}
   end
 
+  @spec next_command(t()) :: {t(), Command.t()}
   def next_command(%{sequence: 0, address: address} = device) do
     command = Command.new(address, POLL)
     {device, command}

@@ -17,9 +17,18 @@ defmodule Jeff.SecureChannel do
     :scbkd?
   ]
 
+  @type t :: %__MODULE__{}
+
   @scbk_default Base.decode16!("303132333435363738393A3B3C3D3E3F")
   @padding_start 0x80
 
+  @spec new(keyword()) :: %__MODULE__{
+          scbk: binary(),
+          server_rnd: binary(),
+          initialized?: false,
+          established?: false,
+          scbkd?: boolean()
+        }
   def new(opts \\ []) do
     scbk = Keyword.get(opts, :scbk, @scbk_default)
     server_rnd = Keyword.get(opts, :server_rnd, :rand.bytes(8))
@@ -33,6 +42,7 @@ defmodule Jeff.SecureChannel do
     }
   end
 
+  @spec initialize(t(), Jeff.Reply.EncryptionClient.t()) :: t()
   def initialize(
         %{scbk: scbk, server_rnd: server_rnd} = sc,
         %{cryptogram: client_cryptogram, cuid: _cuid, rnd: client_rnd}
@@ -56,10 +66,12 @@ defmodule Jeff.SecureChannel do
     }
   end
 
+  @spec establish(t(), binary()) :: t()
   def establish(sc, rmac) do
     %{sc | rmac: rmac, established?: true}
   end
 
+  @spec calculate_mac(t(), binary(), boolean()) :: t()
   def calculate_mac(sc, data, command?) do
     iv = if command?, do: sc.rmac, else: sc.cmac
 
@@ -72,14 +84,14 @@ defmodule Jeff.SecureChannel do
     end
   end
 
-  def do_calculate_mac(sc, <<block::binary-size(16), rest::binary>> = data, iv)
-      when byte_size(data) > 16 do
+  defp do_calculate_mac(sc, <<block::binary-size(16), rest::binary>> = data, iv)
+       when byte_size(data) > 16 do
     key = sc.smac1
     iv = :crypto.crypto_one_time(:aes_128_cbc, key, iv, block, encrypt: true)
     do_calculate_mac(sc, rest, iv)
   end
 
-  def do_calculate_mac(sc, block, iv) do
+  defp do_calculate_mac(sc, block, iv) do
     padding_start = <<0x80>>
     key = sc.smac2
     block = block <> padding_start
@@ -89,6 +101,7 @@ defmodule Jeff.SecureChannel do
     :crypto.crypto_one_time(:aes_128_cbc, key, iv, block, encrypt: true)
   end
 
+  @spec encrypt(t(), binary()) :: binary()
   def encrypt(sc, data) do
     key = sc.enc
 
@@ -104,6 +117,7 @@ defmodule Jeff.SecureChannel do
     )
   end
 
+  @spec decrypt(t(), binary()) :: binary()
   def decrypt(sc, data) do
     key = sc.enc
 
@@ -118,16 +132,21 @@ defmodule Jeff.SecureChannel do
     |> hd()
   end
 
+  @spec gen_enc(binary(), binary()) :: binary()
   def gen_enc(server_rnd, scbk), do: gen_session_key(<<0x01, 0x82>>, server_rnd, scbk)
 
+  @spec gen_smac1(binary(), binary()) :: binary()
   def gen_smac1(server_rnd, scbk), do: gen_session_key(<<0x01, 0x01>>, server_rnd, scbk)
 
+  @spec gen_smac2(binary(), binary()) :: binary()
   def gen_smac2(server_rnd, scbk), do: gen_session_key(<<0x01, 0x02>>, server_rnd, scbk)
 
+  @spec gen_client_cryptogram(binary(), binary(), binary()) :: binary()
   def gen_client_cryptogram(server_rnd, client_rnd, enc) do
     gen_key(server_rnd <> client_rnd, enc)
   end
 
+  @spec gen_server_cryptogram(binary(), binary(), binary()) :: binary()
   def gen_server_cryptogram(client_rnd, server_rnd, enc) do
     gen_key(client_rnd <> server_rnd, enc)
   end

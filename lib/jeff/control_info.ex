@@ -1,10 +1,12 @@
 defmodule Jeff.ControlInfo do
   @moduledoc false
 
+  @spec encode(Jeff.Message.t()) :: byte()
   def encode(%{sequence: seq, check_scheme: cs, security?: sec}) do
     encode(seq, cs, sec)
   end
 
+  @spec encode(byte(), Jeff.Device.check_scheme(), boolean()) :: byte()
   def encode(sequence, check_scheme, security?) do
     check_scheme =
       case check_scheme do
@@ -28,6 +30,7 @@ defmodule Jeff.ControlInfo do
     byte
   end
 
+  @spec decode(byte() | integer()) :: {integer(), Jeff.Device.check_scheme(), boolean()}
   def decode(<<byte>>), do: decode(byte)
 
   def decode(byte) when is_integer(byte) do

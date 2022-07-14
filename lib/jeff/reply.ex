@@ -82,11 +82,16 @@ defmodule Jeff.Reply do
   }
   @codes Map.new(@names, fn {code, name} -> {name, code} end)
 
+  @type name :: unquote(Enum.reduce(Map.values(@names), &{:|, [], [&1, &2]}))
+  @type code :: unquote(Enum.reduce(Map.keys(@names), &{:|, [], [&1, &2]}))
+
+  @spec new(Jeff.Message.t()) :: t()
   def new(%{code: code, data: data, address: address}) do
     name_or_code = Map.get(@names, code, code)
     new(address, name_or_code, data)
   end
 
+  @spec new(pos_integer(), name() | code(), binary() | nil) :: t()
   def new(address, code, data \\ nil)
 
   def new(address, code, data) when is_integer(code) do
@@ -125,6 +130,8 @@ defmodule Jeff.Reply do
   defp decode(_name, <<>>), do: nil
   defp decode(name, data), do: Module.concat(__MODULE__, name).decode(data)
 
+  @spec code(name()) :: code()
   def code(name), do: @codes[name]
+  @spec name(code()) :: name()
   def name(code), do: @names[code]
 end

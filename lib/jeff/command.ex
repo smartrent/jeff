@@ -36,7 +36,7 @@ defmodule Jeff.Command do
           address: byte(),
           code: byte(),
           data: binary(),
-          name: atom(),
+          name: name(),
           caller: reference()
         }
 
@@ -83,6 +83,10 @@ defmodule Jeff.Command do
   }
   @codes Map.new(@names, fn {code, name} -> {name, code} end)
 
+  @type name :: unquote(Enum.reduce(Map.values(@names), &{:|, [], [&1, &2]}))
+  @type code :: unquote(Enum.reduce(Map.keys(@names), &{:|, [], [&1, &2]}))
+
+  @spec new(Jeff.osdp_address(), name(), keyword()) :: t()
   def new(address, name, params \\ []) do
     {caller, params} = Keyword.pop(params, :caller)
 
@@ -116,6 +120,8 @@ defmodule Jeff.Command do
   defp encode(ACURXSIZE, size: size), do: <<size::size(16)-little>>
   defp encode(ABORT, _params), do: nil
 
+  @spec code(name()) :: code()
   def code(name), do: @codes[name]
+  @spec name(code()) :: name()
   def name(code), do: @names[code]
 end
