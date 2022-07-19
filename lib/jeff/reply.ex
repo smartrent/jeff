@@ -39,6 +39,7 @@ defmodule Jeff.Reply do
     ComData,
     EncryptionClient,
     ErrorCode,
+    FileTransferStatus,
     IdReport,
     KeypadData,
     LocalStatus
@@ -126,6 +127,7 @@ defmodule Jeff.Reply do
   defp decode(RAW, data), do: CardData.decode(data)
   defp decode(CCRYPT, data), do: EncryptionClient.decode(data)
   defp decode(RMAC_I, data), do: data
+  defp decode(FTSTAT, data), do: FileTransferStatus.decode(data)
   defp decode(_name, nil), do: nil
   defp decode(_name, <<>>), do: nil
   defp decode(name, data), do: Module.concat(__MODULE__, name).decode(data)

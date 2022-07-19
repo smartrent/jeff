@@ -3,7 +3,7 @@ defmodule Jeff do
   Control an Access Control Unit (ACU) and send commands to a Peripheral Device (PD)
   """
 
-  alias Jeff.{ACU, Command, Device, Reply}
+  alias Jeff.{ACU, Command, Command.FileTransfer, Device, Reply}
 
   @type acu() :: GenServer.server()
   @type device_opt() :: ACU.device_opt()
@@ -84,5 +84,32 @@ defmodule Jeff do
           Reply.ComData.t() | Reply.ErrorCode.t()
   def set_com(acu, address, params) do
     ACU.send_command(acu, address, COMSET, params).data
+  end
+
+  @doc """
+  Send file data to a PD
+  """
+  @spec file_transfer(acu(), osdp_address(), binary()) ::
+          Reply.FileTransferStatus.t() | Reply.ErrorCode.t()
+  def file_transfer(acu, address, data) when is_binary(data) do
+    with %{name: PDCAP, data: caps} <- ACU.send_command(acu, address, CAP) do
+      max = caps[:receive_buffer_size] || 128
+
+      FileTransfer.command_set(data, max)
+      |> run_file_transfer(acu, address)
+    end
+  end
+
+  defp run_file_transfer([cmd | rem], acu, address) do
+    ACU.send_command(acu, address, FILETRANSFER, Map.to_list(cmd))
+    |> FileTransfer.adjust_from_reply(rem)
+    |> case do
+      {:cont, next, delay} ->
+        :timer.sleep(delay)
+        run_file_transfer(next, acu, address)
+
+      {:halt, data} ->
+        data
+    end
   end
 end
