@@ -69,18 +69,21 @@ defmodule Jeff.Transport do
     _ = UART.drain(uart)
     :ok = UART.close(uart)
 
+    s = %{s | uart: nil}
+
     case info do
       {:close, from} ->
         Connection.reply(from, :ok)
+        {:stop, :normal, s}
 
       {:error, :closed} ->
         Logger.error("Serial connection closed")
+        {:connect, :reconnect, %{s | uart: nil}}
 
       {:error, reason} ->
         Logger.error("Serial connection error: #{inspect(reason)}")
+        {:connect, :reconnect, %{s | uart: nil}}
     end
-
-    {:connect, :reconnect, %{s | uart: nil}}
   end
 
   @impl Connection
