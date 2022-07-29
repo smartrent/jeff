@@ -172,6 +172,11 @@ defmodule Jeff.ACU do
     {:noreply, state}
   end
 
+  @impl GenServer
+  def terminate(_reason, state) do
+    Transport.close(state.conn)
+  end
+
   # Helper functions
 
   defp handle_reply(state, %{name: CCRYPT} = reply) do
