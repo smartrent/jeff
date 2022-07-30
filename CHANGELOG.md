@@ -1,3 +1,14 @@
+## [v0.4.0] - 2022-07-29
+
+### Changed
+
+- Capabilities now returns a map. See `Jeff.Reply.Capabilities` for more info.
+
+### Fixed
+
+- Gracefully handle ACU process termination to prevent orphaned Jeff.Transport
+  and Circuits.UART processes.
+
 ## [v0.3.2] - 2022-04-13
 
 ### Added
