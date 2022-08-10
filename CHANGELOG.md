@@ -1,3 +1,10 @@
+## [v0.4.1] - 2022-08-10
+
+### Added
+
+- Added `:transport_opts` option to `Jeff.ACU.start_link` for passing options
+  to the underlying transport.
+
 ## [v0.4.0] - 2022-07-29
 
 ### Changed
