@@ -18,6 +18,7 @@ defmodule Jeff.ACU do
           {:name, atom()}
           | {:serial_port, String.t()}
           | {:controlling_process, Process.dest()}
+          | {:transport_opts, Transport.opts()}
 
   @type device_opt() :: {:check_scheme, atom()}
 
@@ -75,7 +76,8 @@ defmodule Jeff.ACU do
   def init(opts) do
     controlling_process = Keyword.get(opts, :controlling_process)
     serial_port = Keyword.get(opts, :serial_port, "/dev/ttyUSB0")
-    {:ok, conn} = Transport.start_link(port: serial_port, speed: 9600)
+    transport_opts = Keyword.get(opts, :transport_opts, [])
+    {:ok, conn} = Transport.start_link(serial_port, transport_opts)
 
     state = Bus.new()
     state = %{state | conn: conn, controlling_process: controlling_process}
