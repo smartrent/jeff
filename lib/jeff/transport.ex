@@ -5,24 +5,21 @@ defmodule Jeff.Transport do
   alias Circuits.UART
   require Logger
 
-  @type baud() :: 9600 | 19200 | 38400 | 57600 | 115_200 | 230_400
-
-  @type args() :: [
-          port: binary(),
-          speed: baud()
-        ]
+  @type opts :: [Circuits.UART.uart_option()]
 
   @type t() :: [
+          opts: opts(),
           port: binary(),
-          speed: baud(),
           uart: pid()
         ]
 
-  defstruct port: nil, speed: nil, uart: nil
+  defstruct opts: [], port: nil, uart: nil
 
-  @spec start_link(args()) :: GenServer.on_start()
-  def start_link(init_args) do
-    Connection.start_link(__MODULE__, init_args)
+  @default_opts [active: false, speed: 9600, framing: Jeff.Framing]
+
+  @spec start_link(binary(), opts()) :: GenServer.on_start()
+  def start_link(port, opts \\ []) do
+    Connection.start_link(__MODULE__, {port, opts})
   end
 
   @spec send(GenServer.server(), binary()) :: :ok | {:error, term()}
@@ -37,20 +34,16 @@ defmodule Jeff.Transport do
   def close(conn), do: Connection.call(conn, :close)
 
   @impl Connection
-  def init(init_args) do
-    port = Keyword.fetch!(init_args, :port)
-    speed = Keyword.fetch!(init_args, :speed)
+  def init({port, opts}) do
     {:ok, uart} = UART.start_link()
 
-    s = %{port: port, speed: speed, uart: uart}
+    s = %{port: port, opts: Keyword.merge(@default_opts, opts), uart: uart}
 
     {:connect, :init, s}
   end
 
   @impl Connection
-  def connect(_, %{port: port, speed: speed, uart: uart} = s) do
-    opts = [speed: speed, active: false, framing: Jeff.Framing]
-
+  def connect(_, %{opts: opts, port: port, uart: uart} = s) do
     case UART.open(uart, port, opts) do
       :ok ->
         {:ok, s}
