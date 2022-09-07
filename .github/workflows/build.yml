@@ -8,7 +8,8 @@ jobs:
     strategy:
       matrix:
         beam:
-          - { otp: '25.0.2', elixir: '1.13.4' }
+          - { otp: '25.0.4', elixir: '1.14.0' }
+          - { otp: '25.0.4', elixir: '1.13.4' }
         os:
           - name: Linux
             runner: ubuntu-latest
