@@ -31,7 +31,7 @@ defmodule Jeff.Reply do
   | XRD       | 0xB1 | Extended Read Response                     | APDU and details |
   """
 
-  use Bitwise
+  import Bitwise
 
   alias Jeff.Reply.{
     Capabilities,
