@@ -10,7 +10,7 @@ defmodule Jeff.Reply.InputStatus do
   @type state :: :active | :inactive
 
   @type t :: %__MODULE__{
-          inputs: %{non_neg_integer() => state()}
+          inputs: %{non_neg_integer() => state() | byte()}
         }
 
   @spec new(map()) :: t()
@@ -29,5 +29,6 @@ defmodule Jeff.Reply.InputStatus do
   end
 
   defp input_status(0x00), do: :inactive
-  defp input_status(_), do: :active
+  defp input_status(0x01), do: :active
+  defp input_status(other), do: other
 end

@@ -4,20 +4,20 @@ defmodule Jeff.Reply.InputStatusTest do
   alias Jeff.Reply.InputStatus
 
   test "decode input status report" do
-    assert InputStatus.decode(<<1>>) ==
+    assert InputStatus.decode(<<0x01>>) ==
              %InputStatus{
                inputs: %{
                  0 => :active
                }
              }
 
-    assert InputStatus.decode(<<0, 1, 0, 1, 0>>) ==
+    assert InputStatus.decode(<<0x01, 0xFF, 0x00, 0xAB, 0x00>>) ==
              %InputStatus{
                inputs: %{
-                 0 => :inactive,
-                 1 => :active,
+                 0 => :active,
+                 1 => 0xFF,
                  2 => :inactive,
-                 3 => :active,
+                 3 => 0xAB,
                  4 => :inactive
                }
              }
