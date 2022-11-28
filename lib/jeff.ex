@@ -93,4 +93,12 @@ defmodule Jeff do
   def input_status(acu, address) do
     ACU.send_command(acu, address, ISTAT).data
   end
+
+  @doc """
+  Instructs the PD to reply with an output status report.
+  """
+  @spec output_status(acu(), osdp_address()) :: Reply.InputStatus.t() | Reply.ErrorCode.t()
+  def output_status(acu, address) do
+    ACU.send_command(acu, address, OSTAT).data
+  end
 end

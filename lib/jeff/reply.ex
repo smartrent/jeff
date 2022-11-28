@@ -42,7 +42,8 @@ defmodule Jeff.Reply do
     IdReport,
     InputStatus,
     KeypadData,
-    LocalStatus
+    LocalStatus,
+    OutputStatus
   }
 
   @type t() :: %__MODULE__{
@@ -123,6 +124,7 @@ defmodule Jeff.Reply do
   defp decode(PDCAP, data), do: Capabilities.decode(data)
   defp decode(LSTATR, data), do: LocalStatus.decode(data)
   defp decode(ISTATR, data), do: InputStatus.decode(data)
+  defp decode(OSTATR, data), do: OutputStatus.decode(data)
   defp decode(COM, data), do: ComData.decode(data)
   defp decode(KEYPAD, data), do: KeypadData.decode(data)
   defp decode(RAW, data), do: CardData.decode(data)
