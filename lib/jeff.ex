@@ -85,4 +85,12 @@ defmodule Jeff do
   def set_com(acu, address, params) do
     ACU.send_command(acu, address, COMSET, params).data
   end
+
+  @doc """
+  Instructs the PD to reply with an input status report.
+  """
+  @spec input_status(acu(), osdp_address()) :: Reply.InputStatus.t() | Reply.ErrorCode.t()
+  def input_status(acu, address) do
+    ACU.send_command(acu, address, ISTAT).data
+  end
 end
