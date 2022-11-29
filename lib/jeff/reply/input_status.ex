@@ -7,10 +7,10 @@ defmodule Jeff.Reply.InputStatus do
 
   defstruct [:inputs]
 
-  @type state :: :active | :inactive
+  @type state :: :active | :inactive | 2..255
 
   @type t :: %__MODULE__{
-          inputs: %{non_neg_integer() => state() | byte()}
+          inputs: %{non_neg_integer() => state()}
         }
 
   @spec new(map()) :: t()
