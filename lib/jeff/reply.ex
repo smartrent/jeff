@@ -43,6 +43,7 @@ defmodule Jeff.Reply do
     InputStatus,
     KeypadData,
     LocalStatus,
+    MfgReply,
     OutputStatus
   }
 
@@ -129,6 +130,7 @@ defmodule Jeff.Reply do
   defp decode(KEYPAD, data), do: KeypadData.decode(data)
   defp decode(RAW, data), do: CardData.decode(data)
   defp decode(CCRYPT, data), do: EncryptionClient.decode(data)
+  defp decode(MFGREP, data), do: MfgReply.decode(data)
   defp decode(RMAC_I, data), do: data
   defp decode(_name, nil), do: nil
   defp decode(_name, <<>>), do: nil

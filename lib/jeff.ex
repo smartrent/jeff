@@ -8,6 +8,7 @@ defmodule Jeff do
   @type acu() :: GenServer.server()
   @type device_opt() :: ACU.device_opt()
   @type osdp_address() :: 0x00..0x7F
+  @type vendor_code() :: 0x000000..0xFFFFFF
 
   @doc """
   Start an ACU process.
@@ -100,5 +101,21 @@ defmodule Jeff do
   @spec output_status(acu(), osdp_address()) :: Reply.InputStatus.t() | Reply.ErrorCode.t()
   def output_status(acu, address) do
     ACU.send_command(acu, address, OSTAT).data
+  end
+
+  @doc """
+  Sends a manufacturer-specific command to the PD.
+  """
+  @spec mfg(acu(), osdp_address(), Jeff.MfgCommand.t() | [Jeff.Command.Mfg.param()]) ::
+          Jeff.Reply.t()
+  def mfg(acu, address, mfg_command) when is_struct(mfg_command) do
+    vendor_code = Jeff.MfgCommand.vendor_code(mfg_command)
+    data = Jeff.MfgCommand.encode(mfg_command)
+
+    mfg(acu, address, vendor_code: vendor_code, data: data)
+  end
+
+  def mfg(acu, address, params) when is_list(params) do
+    ACU.send_command(acu, address, MFG, params)
   end
 end
