@@ -233,6 +233,14 @@ defmodule Jeff.ACU do
     reply = Reply.new(reply_message)
 
     if controlling_process do
+      if reply.name == MFGREP do
+        send(controlling_process, reply)
+      end
+
+      if reply.name == ISTATR do
+        send(controlling_process, reply)
+      end
+
       if reply.name == KEYPAD do
         event = Events.Keypress.from_reply(reply)
         send(controlling_process, event)
