@@ -29,6 +29,6 @@ defprotocol Jeff.MfgCommand do
   @doc """
   Encodes the given `command` as a binary.
   """
-  @spec encode(t) :: Jeff.Command.Mfg.t()
+  @spec encode(t) :: binary()
   def encode(command)
 end
