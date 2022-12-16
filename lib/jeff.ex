@@ -3,7 +3,7 @@ defmodule Jeff do
   Control an Access Control Unit (ACU) and send commands to a Peripheral Device (PD)
   """
 
-  alias Jeff.{ACU, Command, Device, Reply}
+  alias Jeff.{ACU, Command, Device, MFG.Encoder, Reply}
 
   @type acu() :: GenServer.server()
   @type device_opt() :: ACU.device_opt()
@@ -106,11 +106,10 @@ defmodule Jeff do
   @doc """
   Sends a manufacturer-specific command to the PD.
   """
-  @spec mfg(acu(), osdp_address(), Jeff.MfgCommand.t() | [Jeff.Command.Mfg.param()]) ::
-          Jeff.Reply.t()
+  @spec mfg(acu(), osdp_address(), Encoder.t() | [Command.Mfg.param()]) :: Jeff.Reply.t()
   def mfg(acu, address, mfg_command) when is_struct(mfg_command) do
-    vendor_code = Jeff.MfgCommand.vendor_code(mfg_command)
-    data = Jeff.MfgCommand.encode(mfg_command)
+    vendor_code = Encoder.vendor_code(mfg_command)
+    data = Encoder.encode(mfg_command)
 
     mfg(acu, address, vendor_code: vendor_code, data: data)
   end

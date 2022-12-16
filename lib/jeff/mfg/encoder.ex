@@ -1,6 +1,6 @@
-defprotocol Jeff.MfgCommand do
+defprotocol Jeff.MFG.Encoder do
   @moduledoc """
-  The `Jeff.MfgCommand` protocol converts an Elixir data structure into an
+  The `Jeff.MFG.Encoder` protocol converts an Elixir data structure into an
   osdp_MFG command.
 
   ### Example
@@ -8,7 +8,7 @@ defprotocol Jeff.MfgCommand do
       defmodule InputDisable do
         defstruct input_number: nil, duration: nil
 
-        defimpl Jeff.MfgCommand do
+        defimpl Jeff.MFG.Encoder do
           def vendor_code(_), do: 0xC0FFEE
 
           def encode(command) do
