@@ -30,6 +30,22 @@ defmodule DeviceTest do
     assert device.sequence == 1
   end
 
+  test "reset device communication" do
+    device = Device.new()
+    assert device.sequence == 0
+    assert device = Device.inc_sequence(device)
+    assert device.sequence == 1
+    assert device = Device.inc_sequence(device)
+    assert device.sequence == 2
+
+    secure_channel = device.secure_channel
+
+    assert device = Device.reset(device)
+    assert device.sequence == 0
+    assert device.last_valid_reply == 0
+    assert device.secure_channel != secure_channel
+  end
+
   test "send commands" do
     command = Command.new(0x01, POLL)
     device = Device.new()
