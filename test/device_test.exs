@@ -91,6 +91,26 @@ defmodule DeviceTest do
     assert next_command.name == SCRYPT
   end
 
+  test "next command is KEYSET if security is established in install mode" do
+    device = Device.new(scbk: :rand.bytes(16)) |> Device.inc_sequence()
+    assert device.sequence == 1
+
+    device = %{device | security?: true, install_mode?: true}
+
+    device = %{
+      device
+      | secure_channel: %{
+          device.secure_channel
+          | initialized?: true,
+            established?: true,
+            scbkd?: true
+        }
+    }
+
+    {_device, next_command} = Device.next_command(device)
+    assert next_command.name == KEYSET
+  end
+
   test "next command is POLL if command queue is empty" do
     poll_command = Command.new(0x01, POLL)
     device = Device.new(address: 0x01) |> Device.inc_sequence()

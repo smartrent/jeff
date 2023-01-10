@@ -3,14 +3,26 @@ defmodule Jeff.Device do
   Peripheral Device configuration and handling
   """
 
+  require Logger
+
+  alias Jeff.{Command, SecureChannel}
+
   @type check_scheme :: :checksum | :crc
   @type sequence_number :: 0..3
+
+  @type opt ::
+          {:address, Jeff.osdp_address()}
+          | {:check_scheme, check_scheme()}
+          | {:scbk, SecureChannel.scbk()}
+          | {:security?, boolean()}
 
   @type t :: %__MODULE__{
           address: Jeff.osdp_address(),
           check_scheme: check_scheme(),
           security?: boolean(),
           secure_channel: term(),
+          install_mode?: boolean(),
+          scbk: <<_::128>>,
           sequence: sequence_number(),
           commands: :queue.queue(term()),
           last_valid_reply: non_neg_integer()
@@ -20,20 +32,20 @@ defmodule Jeff.Device do
             check_scheme: :checksum,
             security?: false,
             secure_channel: nil,
+            install_mode?: false,
+            scbk: nil,
             sequence: 0,
             commands: :queue.new(),
             last_valid_reply: nil
 
-  alias Jeff.{Command, SecureChannel}
-
   @offline_threshold_ms 8000
 
-  @spec new(keyword()) :: t()
+  @spec new([opt()]) :: t()
   def new(params \\ []) do
-    secure_channel = SecureChannel.new()
+    secure_channel = SecureChannel.new(scbk: params[:scbk])
 
     __MODULE__
-    |> struct(Keyword.take(params, [:address, :check_scheme, :security?]))
+    |> struct(Keyword.take(params, ~w(address check_scheme scbk security?)a))
     |> Map.put(:secure_channel, secure_channel)
   end
 
@@ -49,7 +61,20 @@ defmodule Jeff.Device do
   """
   @spec reset(t()) :: t()
   def reset(device) do
-    %{device | sequence: 0, last_valid_reply: 0, secure_channel: SecureChannel.new()}
+    %{
+      device
+      | install_mode?: false,
+        sequence: 0,
+        last_valid_reply: 0,
+        secure_channel: SecureChannel.new(scbk: device.scbk)
+    }
+  end
+
+  @spec install_mode(t()) :: t()
+  def install_mode(%__MODULE__{install_mode?: true} = device), do: device
+
+  def install_mode(device) do
+    %{device | secure_channel: SecureChannel.new(), install_mode?: true}
   end
 
   @spec receive_valid_reply(t()) :: t()
@@ -95,6 +120,18 @@ defmodule Jeff.Device do
         %{security?: true, secure_channel: %{established?: false}, address: address} = device
       ) do
     command = Command.new(address, SCRYPT, cryptogram: device.secure_channel.server_cryptogram)
+    {device, command}
+  end
+
+  def next_command(
+        %{
+          security?: true,
+          install_mode?: true,
+          secure_channel: %{established?: true, scbkd?: true},
+          address: address
+        } = device
+      ) do
+    command = Command.new(address, KEYSET, key: device.scbk)
     {device, command}
   end
 

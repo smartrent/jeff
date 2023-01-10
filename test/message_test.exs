@@ -71,8 +71,15 @@ defmodule MessageTest do
     # RMAC-I reply
     assert Message.scs(0x1 + 0x80, 0x78, false) == 0x14
 
+    # Commands with no data payload
+    assert Message.scs(0x1, 0x60, true) == 0x15
+    assert Message.scs(0x1, 0x64, true) == 0x15
+    assert Message.scs(0x1, 0x65, true) == 0x15
+    assert Message.scs(0x1, 0x66, true) == 0x15
+    assert Message.scs(0x1, 0x67, true) == 0x15
+
     # Any other command - established secure channel
-    assert Message.scs(0x1, 0x60, true) == 0x17
+    assert Message.scs(0x1, 0x61, true) == 0x17
 
     # Any other reply - established secure channel
     assert Message.scs(0x1 + 0x80, 0x40, true) == 0x18

@@ -48,7 +48,7 @@ defmodule SecureChannelTest do
       rnd: client_rnd
     }
 
-    sc =
+    {:ok, sc} =
       SC.new(scbk: scbk_d_key, server_rnd: server_rnd)
       |> SC.initialize(encryption_client)
 

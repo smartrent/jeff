@@ -1,6 +1,25 @@
 defmodule Jeff.ACU do
   @moduledoc """
-  GenServer process for an ACU
+  GenServer process for an ACU.
+
+  ### Messages
+
+  If `Jeff.ACU` is started with the `controlling_process` option, the passed pid
+  will be sent any unsolicited events/replies received from peripheral devices, as
+  well as messages regarding device status.
+
+  Unsolicited events/replies consist of any of the following structs:
+
+  * `Jeff.Events.CardRead`
+  * `Jeff.Events.Keypress`
+  * `Jeff.Reply`
+
+  Device status messages will be sent as tuples:
+
+  * `{:install_mode_complete, %Jeff.Device{}}` - sent when a device has had its
+    SCBK set and the secure channel will be re-established with the new SCBK
+  * `{:secure_channel_failed, %Jeff.Device{}}` - sent when a device is removed from
+    the `Jeff.ACU` due to secure channel establishment failure
   """
 
   require Logger
@@ -20,8 +39,6 @@ defmodule Jeff.ACU do
           | {:controlling_process, Process.dest()}
           | {:transport_opts, Transport.opts()}
 
-  @type device_opt() :: {:check_scheme, atom()}
-
   @doc """
   Start the ACU process.
   """
@@ -34,9 +51,14 @@ defmodule Jeff.ACU do
   @doc """
   Register a peripheral device on the ACU communication bus.
   """
-  @spec add_device(acu(), osdp_address(), [device_opt()]) :: Device.t()
+  @spec add_device(acu(), osdp_address(), [Device.opt()]) :: Device.t()
   def add_device(acu, address, opts \\ []) do
     GenServer.call(acu, {:add_device, address, opts})
+  end
+
+  @spec get_device(acu(), osdp_address()) :: Device.t()
+  def get_device(acu, address) do
+    GenServer.call(acu, {:get_device, address})
   end
 
   @doc """
@@ -141,6 +163,11 @@ defmodule Jeff.ACU do
     {:reply, device, state}
   end
 
+  def handle_call({:get_device, address}, _from, state) do
+    device = Bus.get_device(state, address)
+    {:reply, device, state}
+  end
+
   def handle_call({:remove_device, address}, _from, state) do
     device = Bus.get_device(state, address)
     state = Bus.remove_device(state, address)
@@ -183,8 +210,22 @@ defmodule Jeff.ACU do
 
   defp handle_reply(state, %{name: CCRYPT} = reply) do
     device = Bus.current_device(state)
-    secure_channel = SecureChannel.initialize(device.secure_channel, reply.data)
-    device = %{device | secure_channel: secure_channel}
+
+    device =
+      case SecureChannel.initialize(device.secure_channel, reply.data) do
+        {:ok, sc} ->
+          %{device | secure_channel: sc}
+
+        :error ->
+          if device.install_mode? do
+            # TODO:
+            maybe_notify(state, {:secure_channel_failed, device})
+            device
+          else
+            Device.install_mode(device)
+          end
+      end
+
     Bus.put_device(state, device)
   end
 
@@ -192,6 +233,20 @@ defmodule Jeff.ACU do
     device = Bus.current_device(state)
     secure_channel = SecureChannel.establish(device.secure_channel, reply.data)
     device = %{device | secure_channel: secure_channel}
+
+    Bus.put_device(state, device)
+  end
+
+  defp handle_reply(%{command: %{name: KEYSET}} = state, %{name: ACK}) do
+    device = Bus.current_device(state)
+    secure_channel = SecureChannel.new(scbk: device.scbk)
+
+    if device.install_mode? do
+      maybe_notify(state, {:install_mode_complete, device})
+    end
+
+    device = %{device | install_mode?: false, secure_channel: secure_channel}
+
     Bus.put_device(state, device)
   end
 
@@ -200,6 +255,21 @@ defmodule Jeff.ACU do
     device = Bus.current_device(state)
     device = Device.reset(device)
     Bus.put_device(state, device)
+  end
+
+  # NAK while establishing secure channel
+  defp handle_reply(
+         %{command: %{name: command_name}} = state,
+         %{name: NAK, data: %Reply.ErrorCode{code: code}} = _reply
+       )
+       when command_name in [CHLNG, SCRYPT] and code in [0x06, 0x09] do
+    device = Bus.current_device(state)
+
+    if device.install_mode? do
+      maybe_notify(state, {:secure_channel_failed, device})
+    else
+      state
+    end
   end
 
   defp handle_reply(state, _reply), do: state
@@ -232,31 +302,30 @@ defmodule Jeff.ACU do
 
     reply = Reply.new(reply_message)
 
-    if controlling_process do
-      if reply.name == MFGREP do
-        send(controlling_process, reply)
-      end
+    # Handle solicited and unsolicited replies
+    cond do
+      command.caller ->
+        GenServer.reply(command.caller, reply)
 
-      if reply.name == ISTATR do
-        send(controlling_process, reply)
-      end
+      is_nil(controlling_process) ->
+        :ok
 
-      if reply.name == KEYPAD do
+      reply.name in [ACK, NAK, CCRYPT, RMAC_I] ->
+        :ok
+
+      reply.name == KEYPAD ->
         event = Events.Keypress.from_reply(reply)
-        send(controlling_process, event)
-      end
+        maybe_notify(state, event)
 
-      if reply.name == RAW do
+      reply.name == RAW ->
         event = Events.CardRead.from_reply(reply)
-        send(controlling_process, event)
-      end
+        maybe_notify(state, event)
+
+      true ->
+        maybe_notify(state, reply)
     end
 
     state = handle_reply(state, reply)
-
-    if command.caller do
-      GenServer.reply(command.caller, reply)
-    end
 
     %{state | reply: reply}
   end
@@ -278,4 +347,7 @@ defmodule Jeff.ACU do
     send(self(), :tick)
     Bus.tick(bus)
   end
+
+  defp maybe_notify(%{controlling_process: pid}, message) when is_pid(pid), do: send(pid, message)
+  defp maybe_notify(_, message), do: message
 end
