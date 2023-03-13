@@ -37,7 +37,7 @@ defmodule Jeff.Command do
           code: byte(),
           data: binary(),
           name: name(),
-          caller: reference()
+          caller: reference() | nil
         }
 
   defstruct [:address, :code, :data, :name, :caller]

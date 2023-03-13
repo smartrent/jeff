@@ -11,17 +11,25 @@ defmodule Jeff.Bus do
             conn: nil,
             controlling_process: nil
 
-  @type t :: %__MODULE__{}
+  @type t :: %__MODULE__{
+          registry: map(),
+          command: Jeff.Command.t() | nil,
+          reply: Jeff.Reply.t() | nil,
+          cursor: Jeff.osdp_address() | nil,
+          poll: list(),
+          conn: pid() | nil,
+          controlling_process: pid() | nil
+        }
 
   @spec new(keyword()) :: t()
-  def new(_opts \\ []) do
-    %__MODULE__{}
+  def new(opts \\ []) do
+    struct(__MODULE__, opts)
   end
 
-  @spec add_device(t(), keyword()) :: t()
+  @spec add_device(t(), [Device.opt()]) :: t()
   def add_device(bus, opts \\ []) do
     device = Device.new(opts)
-    _bus = register(bus, device.address, device)
+    register(bus, device.address, device)
   end
 
   @spec remove_device(t(), byte()) :: t()
@@ -51,16 +59,18 @@ defmodule Jeff.Bus do
     register(bus, address, device)
   end
 
-  @spec current_device(%__MODULE__{cursor: byte(), registry: map()}) :: Device.t()
+  @spec current_device(t()) :: Device.t()
   def current_device(%{cursor: cursor} = bus) do
     get_device(bus, cursor)
   end
 
+  @spec register(t(), Jeff.osdp_address(), Device.t()) :: t()
   defp register(%{registry: registry} = bus, address, device) do
     registry = Map.put(registry, address, device)
     %{bus | registry: registry}
   end
 
+  @spec register(t(), Device.t()) :: t()
   defp register(%{cursor: cursor} = bus, device) do
     _bus = register(bus, cursor, device)
   end

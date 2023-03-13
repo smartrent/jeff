@@ -7,6 +7,7 @@ defmodule Jeff.SecureChannel do
     :enc,
     :established?,
     :initialized?,
+    :failed?,
     :scbk,
     :server_cryptogram,
     :server_rnd,
@@ -19,6 +20,9 @@ defmodule Jeff.SecureChannel do
 
   @type t :: %__MODULE__{}
 
+  @typedoc "Secure Channel Base Key"
+  @type scbk :: <<_::128>>
+
   @scbk_default Base.decode16!("303132333435363738393A3B3C3D3E3F")
   @padding_start 0x80
 
@@ -27,10 +31,11 @@ defmodule Jeff.SecureChannel do
           server_rnd: binary(),
           initialized?: false,
           established?: false,
+          failed?: false,
           scbkd?: boolean()
         }
   def new(opts \\ []) do
-    scbk = Keyword.get(opts, :scbk, @scbk_default)
+    scbk = opts[:scbk] || @scbk_default
     server_rnd = Keyword.get(opts, :server_rnd, :rand.bytes(8))
 
     %__MODULE__{
@@ -38,11 +43,12 @@ defmodule Jeff.SecureChannel do
       server_rnd: server_rnd,
       initialized?: false,
       established?: false,
+      failed?: false,
       scbkd?: scbk == @scbk_default
     }
   end
 
-  @spec initialize(t(), Jeff.Reply.EncryptionClient.t()) :: t()
+  @spec initialize(t(), Jeff.Reply.EncryptionClient.t()) :: {:ok, t()} | :error
   def initialize(
         %{scbk: scbk, server_rnd: server_rnd} = sc,
         %{cryptogram: client_cryptogram, cuid: _cuid, rnd: client_rnd}
@@ -50,20 +56,23 @@ defmodule Jeff.SecureChannel do
     enc = gen_enc(server_rnd, scbk)
 
     # verify client cryptogram
-    ^client_cryptogram = gen_client_cryptogram(server_rnd, client_rnd, enc)
+    if client_cryptogram == gen_client_cryptogram(server_rnd, client_rnd, enc) do
+      smac1 = gen_smac1(server_rnd, scbk)
+      smac2 = gen_smac2(server_rnd, scbk)
+      server_cryptogram = gen_server_cryptogram(client_rnd, server_rnd, enc)
 
-    smac1 = gen_smac1(server_rnd, scbk)
-    smac2 = gen_smac2(server_rnd, scbk)
-    server_cryptogram = gen_server_cryptogram(client_rnd, server_rnd, enc)
-
-    %{
-      sc
-      | enc: enc,
-        server_cryptogram: server_cryptogram,
-        smac1: smac1,
-        smac2: smac2,
-        initialized?: true
-    }
+      {:ok,
+       %{
+         sc
+         | enc: enc,
+           server_cryptogram: server_cryptogram,
+           smac1: smac1,
+           smac2: smac2,
+           initialized?: true
+       }}
+    else
+      :error
+    end
   end
 
   @spec establish(t(), binary()) :: t()

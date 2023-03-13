@@ -6,7 +6,7 @@ defmodule Jeff do
   alias Jeff.{ACU, Command, Device, MFG.Encoder, Reply}
 
   @type acu() :: GenServer.server()
-  @type device_opt() :: ACU.device_opt()
+  @type device_opt() :: Device.opt()
   @type osdp_address() :: 0x00..0x7F
   @type vendor_code() :: 0x000000..0xFFFFFF
 

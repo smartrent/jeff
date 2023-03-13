@@ -90,7 +90,7 @@ defmodule Jeff.Message do
   end
 
   @spec scs(Jeff.osdp_address(), byte(), boolean()) ::
-          0x11 | 0x12 | 0x13 | 0x14 | 0x17 | 0x18 | nil
+          0x11 | 0x12 | 0x13 | 0x14 | 0x15 | 0x17 | 0x18 | nil
   def scs(address, code, sc_established?) do
     do_scs(type(address), code, sc_established?)
   end
@@ -99,6 +99,7 @@ defmodule Jeff.Message do
   defp do_scs(:reply, 0x76, _), do: 0x12
   defp do_scs(:command, 0x77, _), do: 0x13
   defp do_scs(:reply, 0x78, _), do: 0x14
+  defp do_scs(:command, id, true) when id in [0x60, 0x64, 0x65, 0x66, 0x67], do: 0x15
   defp do_scs(:command, _, true), do: 0x17
   defp do_scs(:reply, _, true), do: 0x18
   defp do_scs(:command, _, false), do: nil
@@ -144,7 +145,7 @@ defmodule Jeff.Message do
 
   defp maybe_add_mac(%{bytes: bytes, device: device} = message) do
     {secure_channel, mac} =
-      if add_mac?(message) do
+      if device.secure_channel.established? && add_mac?(message) do
         secure_channel = SecureChannel.calculate_mac(device.secure_channel, bytes, true)
         {secure_channel, secure_channel.cmac |> :binary.part(0, 4)}
       else
