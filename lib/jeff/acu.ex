@@ -50,7 +50,8 @@ defmodule Jeff.ACU do
   @doc """
   Send a command to a peripheral device.
   """
-  @spec send_command(acu(), osdp_address(), atom(), keyword()) :: Reply.t()
+  @spec send_command(acu(), osdp_address(), atom(), keyword()) ::
+          {:ok, Reply.t()} | {:error, :timeout}
   def send_command(acu, address, name, params \\ []) do
     GenServer.call(acu, {:send_command, address, name, params})
   end
@@ -59,7 +60,8 @@ defmodule Jeff.ACU do
   Send a command to a peripheral device that is not yet registered on the ACU.
   Intended to be used for maintenance/diagnostic purposes.
   """
-  @spec send_command_oob(acu(), osdp_address(), atom(), keyword()) :: Reply.t()
+  @spec send_command_oob(acu(), osdp_address(), atom(), keyword()) ::
+          {:ok, Reply.t()} | {:error, :timeout | :registered}
   def send_command_oob(acu, address, name, params \\ []) do
     GenServer.call(acu, {:send_command_oob, address, name, params})
   end
@@ -101,7 +103,7 @@ defmodule Jeff.ACU do
     resp =
       case send_data_oob(state, address, bytes) do
         {:error, _reason} = error -> error
-        {:ok, bytes} -> Message.decode(bytes) |> Reply.new()
+        {:ok, bytes} -> {:ok, Message.decode(bytes) |> Reply.new()}
       end
 
     {:reply, resp, state}
@@ -255,7 +257,7 @@ defmodule Jeff.ACU do
     state = handle_reply(state, reply)
 
     if command.caller do
-      GenServer.reply(command.caller, reply)
+      GenServer.reply(command.caller, {:ok, reply})
     end
 
     %{state | reply: reply}
