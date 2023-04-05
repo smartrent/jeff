@@ -54,16 +54,13 @@ defmodule DeviceTest do
     assert device.commands == {[command], []}
   end
 
-  test "next command is POLL if sequence is 0" do
+  test "next command is used if sequence is 0" do
     queued_command = Command.new(0x01, ID)
-    poll_command = Command.new(0x01, POLL)
     device = Device.new(address: 0x01)
     device = Device.send_command(device, queued_command)
     assert device.sequence == 0
 
-    {_device, next_command} = Device.next_command(device)
-
-    assert next_command == poll_command
+    assert {_device, ^queued_command} = Device.next_command(device)
   end
 
   test "next command is CHLNG if security not initialized" do

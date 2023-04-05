@@ -264,6 +264,11 @@ defmodule Jeff.ACU do
   end
 
   defp handle_recv({:error, :timeout}, state) do
+    # Make sure to report the timeout to any potential callers
+    _ =
+      if from = get_in(state.command, [Access.key(:caller)]),
+        do: GenServer.reply(from, {:error, :timeout})
+
     %{state | reply: :timeout}
   end
 

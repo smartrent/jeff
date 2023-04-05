@@ -79,11 +79,6 @@ defmodule Jeff.Device do
   end
 
   @spec next_command(t()) :: {t(), Command.t()}
-  def next_command(%{sequence: 0, address: address} = device) do
-    command = Command.new(address, POLL)
-    {device, command}
-  end
-
   def next_command(
         %{security?: true, secure_channel: %{initialized?: false}, address: address} = device
       ) do

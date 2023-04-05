@@ -176,13 +176,13 @@ defmodule BusTest do
     bus = Bus.tick(bus)
     assert bus.poll == []
     assert bus.cursor == 0x1
-    assert bus.command == poll_command
+    assert bus.command == id_command
     assert bus.reply == nil
 
     bus = Bus.receive_reply(bus, ack_reply)
     assert bus.poll == []
     assert bus.cursor == 0x1
-    assert bus.command == poll_command
+    assert bus.command == id_command
     assert bus.reply == ack_reply
 
     bus = Bus.tick(bus)
@@ -206,13 +206,13 @@ defmodule BusTest do
     bus = Bus.tick(bus)
     assert bus.poll == []
     assert bus.cursor == 0x1
-    assert bus.command == id_command
+    assert bus.command == poll_command
     assert bus.reply == nil
 
     bus = Bus.receive_reply(bus, pdid_reply)
     assert bus.poll == []
     assert bus.cursor == 0x1
-    assert bus.command == id_command
+    assert bus.command == poll_command
     assert bus.reply == pdid_reply
 
     bus = Bus.tick(bus)
