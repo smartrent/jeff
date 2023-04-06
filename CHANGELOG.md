@@ -1,3 +1,24 @@
+## [v0.5.0] - 2023-04-06
+
+**Breaking Changes**
+
+`Jeff.ACU.send_command/4` and `Jeff.ACU.send_command_oob/4` now return tagged
+tuples of `{:ok, Jeff.Reply.t()}` and `{:error, term()}` instead of just the
+reply struct. You'll need to update you code if you are relying on the returns
+of these functions. Likewise, many of the `Jeff.*` functions were adapted to
+return an error tuple when needed.
+
+### Added
+
+- Added Input and Output commands and replies (#32)
+- Support Manufacturer specific commands/replies (osdp_MFG and osdp_MFGREP) (#33)
+- Use tagged tuples for `send_command` and `send_command_oob` returns (#36)
+
+### Fixed
+
+- Reset communication on sequence number desync (#34)
+- Fix request failures to offline devices (#36)
+
 ## [v0.4.1] - 2022-08-10
 
 ### Added
