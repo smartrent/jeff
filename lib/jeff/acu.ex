@@ -8,8 +8,6 @@ defmodule Jeff.ACU do
   use GenServer
   alias Jeff.{Bus, Command, Device, Events, Message, Reply, SecureChannel, Transport}
 
-  @max_reply_delay 200
-
   @type acu() :: Jeff.acu()
   @type address_availability :: :available | :registered | :timeout | :error
   @type osdp_address() :: Jeff.osdp_address()
@@ -101,7 +99,7 @@ defmodule Jeff.ACU do
     %{bytes: bytes} = Message.new(device, command)
 
     resp =
-      case send_data_oob(state, address, bytes) do
+      case send_data_oob(state, address, bytes, command.timeout) do
         {:error, _reason} = error -> error
         {:ok, bytes} -> {:ok, Message.decode(bytes) |> Reply.new()}
       end
@@ -116,7 +114,7 @@ defmodule Jeff.ACU do
     %{bytes: bytes} = Message.new(device, command)
 
     status =
-      case send_data_oob(state, address, bytes) do
+      case send_data_oob(state, address, bytes, command.timeout) do
         {:error, :registered} ->
           :registered
 
@@ -162,7 +160,7 @@ defmodule Jeff.ACU do
     state = Bus.put_device(state, device)
 
     :ok = Transport.send(conn, bytes)
-    state = Transport.recv(conn, @max_reply_delay) |> handle_recv(state)
+    state = Transport.recv(conn, command.timeout) |> handle_recv(state)
 
     {:noreply, tick(state)}
   end
@@ -272,12 +270,12 @@ defmodule Jeff.ACU do
     %{state | reply: :timeout}
   end
 
-  defp send_data_oob(state, address, bytes) do
+  defp send_data_oob(state, address, bytes, timeout) do
     if Bus.registered?(state, address) do
       {:error, :registered}
     else
       :ok = Transport.send(state.conn, bytes)
-      Transport.recv(state.conn, @max_reply_delay)
+      Transport.recv(state.conn, timeout)
     end
   end
 

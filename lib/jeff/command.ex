@@ -40,7 +40,9 @@ defmodule Jeff.Command do
           caller: reference()
         }
 
-  defstruct [:address, :code, :data, :name, :caller]
+  @max_reply_delay 200
+
+  defstruct [:address, :code, :data, :name, :caller, :timeout]
 
   alias Jeff.Command.{
     BuzzerSettings,
@@ -91,6 +93,15 @@ defmodule Jeff.Command do
   def new(address, name, params \\ []) do
     {caller, params} = Keyword.pop(params, :caller)
 
+    # OSDP 2.2 section 5.7 Timing
+    # REPLY_DELAY should not exceed 200ms and typical delay is 3ms
+    # Only adjust the timeout if you know what you're doing
+    timeout =
+      case params[:timeout] do
+        t when is_integer(t) and t > 0 and t <= 200 -> t
+        _ -> @max_reply_delay
+      end
+
     code = code(name)
     data = encode(name, params)
 
@@ -99,7 +110,8 @@ defmodule Jeff.Command do
       code: code,
       data: data,
       name: name,
-      caller: caller
+      caller: caller,
+      timeout: timeout
     }
   end
 
