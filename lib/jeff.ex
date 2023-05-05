@@ -18,6 +18,54 @@ defmodule Jeff do
   @type cmd_err :: {:error, :timeout | ErrorCode.t()}
 
   @doc """
+  Enable OSDP packet tracing
+
+  Use log level `:debug`
+
+  Available options:
+    * `:ignore_polls` - OSDP polling has to occur at minimum every 200ms which
+      can be noisy in the logs. When this is set, poll commands and ACK messages
+      are ignored when tracing. Default `true`
+
+    * `:ignore_partials` - Partial packets should be rare, but do occur when there
+      is noise on the lines or during other communication synchronization problems.
+      This ignores partial, incomplete packets when enabled. Default `false`
+
+    * `:ignore_marks` - Before sending data, the the line is driven with a 0xFF
+      byte to mark it for sending. This happens on ACU and PD. This is not always
+      useful when tracing, so they can be ignored if all the partial bytes are
+      0xFF. Default `true`
+
+    * `:partials_limit` - Limit of partial packets to store in a buffer. This is
+      most typically not used since partials get logged on next valid packet.
+      However, it protects against cases where valid packets may not be happening
+      and prevents the partial buffer from growing unbounded. Default `100`
+
+  Tracing can also be configuraed in the application config with the same
+  values using the `:tracer` key:
+
+  ```
+  config :jeff, :tracer,
+    enabled: true,
+    ignore_polls: true,
+    ignore_partials: false,
+    ignore_marks: true
+  ```
+  """
+  @spec enable_trace(acu(), [Jeff.Tracer.option()]) :: :ok | {:error, File.posix()}
+  def enable_trace(acu, opts \\ []) do
+    GenServer.call(Jeff.ACU.state(acu).conn, {:set_trace, true, opts})
+  end
+
+  @doc """
+  Disable OSDP packet tracing
+  """
+  @spec disable_trace(acu()) :: :ok | {:error, File.posix()}
+  def disable_trace(acu) do
+    GenServer.call(Jeff.ACU.state(acu).conn, {:set_trace, false, []})
+  end
+
+  @doc """
   Start an ACU process.
   """
   @spec start_acu([ACU.start_opt()]) :: GenServer.on_start()
