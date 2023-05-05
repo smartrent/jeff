@@ -144,7 +144,16 @@ defmodule Jeff.ACU do
   end
 
   def handle_call({:remove_device, address}, _from, state) do
-    device = Bus.get_device(state, address)
+    # TODO: Change this return to :ok
+    # I'm not sure returning a device is needed, but this allows
+    # this function to be safe without changing a ton of internals
+    # by just creating a dummy device struct when it doesn't exist
+    # in the registry. The Bus.remove_device/2 call will be a noop
+    device =
+      if Bus.registered?(state, address),
+        do: Bus.get_device(state, address),
+        else: Device.new(address: address)
+
     state = Bus.remove_device(state, address)
     {:reply, device, state}
   end
