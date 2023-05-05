@@ -72,6 +72,12 @@ defmodule Jeff.ACU do
     GenServer.call(acu, {:check_address, address})
   end
 
+  @doc """
+  Get the state of the ACU
+  """
+  @spec state(acu()) :: Bus.t()
+  def state(acu), do: GenServer.call(acu, :state)
+
   @impl GenServer
   def init(opts) do
     controlling_process = Keyword.get(opts, :controlling_process)
@@ -133,7 +139,6 @@ defmodule Jeff.ACU do
     {:reply, status, state}
   end
 
-  @impl GenServer
   def handle_call({:add_device, address, opts}, _from, state) do
     opts = Keyword.merge(opts, address: address)
     state = Bus.add_device(state, opts)
@@ -155,6 +160,8 @@ defmodule Jeff.ACU do
     state = Bus.remove_device(state, address)
     {:reply, device, state}
   end
+
+  def handle_call(:state, _from, state), do: {:reply, state, state}
 
   @impl GenServer
   def handle_info(:tick, %{command: nil, reply: nil} = state) do
