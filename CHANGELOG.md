@@ -1,3 +1,14 @@
+## [v0.5.1] - 2023-05-08
+
+### Added
+
+- OSDP packet tracing (#39) - `Jeff.enable_trace/2` for more details
+- Allow specifying timeout for commands (#40)
+
+### Fixed
+
+- Removing non-registered devices no longer crashes the ACU process (#38)
+
 ## [v0.5.0] - 2023-04-06
 
 **Breaking Changes**
