@@ -8,8 +8,6 @@ defmodule Jeff.ACU do
   use GenServer
   alias Jeff.{Bus, Command, Device, Events, Message, Reply, SecureChannel, Transport}
 
-  @max_reply_delay 200
-
   @type acu() :: Jeff.acu()
   @type address_availability :: :available | :registered | :timeout | :error
   @type osdp_address() :: Jeff.osdp_address()
@@ -18,6 +16,7 @@ defmodule Jeff.ACU do
           {:name, atom()}
           | {:serial_port, String.t()}
           | {:controlling_process, Process.dest()}
+          | {:transport_opts, Transport.opts()}
 
   @type device_opt() :: {:check_scheme, atom()}
 
@@ -49,7 +48,8 @@ defmodule Jeff.ACU do
   @doc """
   Send a command to a peripheral device.
   """
-  @spec send_command(acu(), osdp_address(), atom(), keyword()) :: Reply.t()
+  @spec send_command(acu(), osdp_address(), atom(), keyword()) ::
+          {:ok, Reply.t()} | {:error, :timeout}
   def send_command(acu, address, name, params \\ []) do
     GenServer.call(acu, {:send_command, address, name, params})
   end
@@ -58,7 +58,8 @@ defmodule Jeff.ACU do
   Send a command to a peripheral device that is not yet registered on the ACU.
   Intended to be used for maintenance/diagnostic purposes.
   """
-  @spec send_command_oob(acu(), osdp_address(), atom(), keyword()) :: Reply.t()
+  @spec send_command_oob(acu(), osdp_address(), atom(), keyword()) ::
+          {:ok, Reply.t()} | {:error, :timeout | :registered}
   def send_command_oob(acu, address, name, params \\ []) do
     GenServer.call(acu, {:send_command_oob, address, name, params})
   end
@@ -71,11 +72,18 @@ defmodule Jeff.ACU do
     GenServer.call(acu, {:check_address, address})
   end
 
+  @doc """
+  Get the state of the ACU
+  """
+  @spec state(acu()) :: Bus.t()
+  def state(acu), do: GenServer.call(acu, :state)
+
   @impl GenServer
   def init(opts) do
     controlling_process = Keyword.get(opts, :controlling_process)
     serial_port = Keyword.get(opts, :serial_port, "/dev/ttyUSB0")
-    {:ok, conn} = Transport.start_link(port: serial_port, speed: 9600)
+    transport_opts = Keyword.get(opts, :transport_opts, [])
+    {:ok, conn} = Transport.start_link(serial_port, transport_opts)
 
     state = Bus.new()
     state = %{state | conn: conn, controlling_process: controlling_process}
@@ -97,9 +105,9 @@ defmodule Jeff.ACU do
     %{bytes: bytes} = Message.new(device, command)
 
     resp =
-      case send_data_oob(state, address, bytes) do
+      case send_data_oob(state, address, bytes, command.timeout) do
         {:error, _reason} = error -> error
-        {:ok, bytes} -> Message.decode(bytes) |> Reply.new()
+        {:ok, bytes} -> {:ok, Message.decode(bytes) |> Reply.new()}
       end
 
     {:reply, resp, state}
@@ -112,7 +120,7 @@ defmodule Jeff.ACU do
     %{bytes: bytes} = Message.new(device, command)
 
     status =
-      case send_data_oob(state, address, bytes) do
+      case send_data_oob(state, address, bytes, command.timeout) do
         {:error, :registered} ->
           :registered
 
@@ -131,7 +139,6 @@ defmodule Jeff.ACU do
     {:reply, status, state}
   end
 
-  @impl GenServer
   def handle_call({:add_device, address, opts}, _from, state) do
     opts = Keyword.merge(opts, address: address)
     state = Bus.add_device(state, opts)
@@ -140,10 +147,21 @@ defmodule Jeff.ACU do
   end
 
   def handle_call({:remove_device, address}, _from, state) do
-    device = Bus.get_device(state, address)
+    # TODO: Change this return to :ok
+    # I'm not sure returning a device is needed, but this allows
+    # this function to be safe without changing a ton of internals
+    # by just creating a dummy device struct when it doesn't exist
+    # in the registry. The Bus.remove_device/2 call will be a noop
+    device =
+      if Bus.registered?(state, address),
+        do: Bus.get_device(state, address),
+        else: Device.new(address: address)
+
     state = Bus.remove_device(state, address)
     {:reply, device, state}
   end
+
+  def handle_call(:state, _from, state), do: {:reply, state, state}
 
   @impl GenServer
   def handle_info(:tick, %{command: nil, reply: nil} = state) do
@@ -158,7 +176,7 @@ defmodule Jeff.ACU do
     state = Bus.put_device(state, device)
 
     :ok = Transport.send(conn, bytes)
-    state = Transport.recv(conn, @max_reply_delay) |> handle_recv(state)
+    state = Transport.recv(conn, command.timeout) |> handle_recv(state)
 
     {:noreply, tick(state)}
   end
@@ -170,6 +188,11 @@ defmodule Jeff.ACU do
 
   def handle_info(_, state) do
     {:noreply, state}
+  end
+
+  @impl GenServer
+  def terminate(_reason, state) do
+    Transport.close(state.conn)
   end
 
   # Helper functions
@@ -185,6 +208,13 @@ defmodule Jeff.ACU do
     device = Bus.current_device(state)
     secure_channel = SecureChannel.establish(device.secure_channel, reply.data)
     device = %{device | secure_channel: secure_channel}
+    Bus.put_device(state, device)
+  end
+
+  # NAK - unexpected sequence number
+  defp handle_reply(state, %{name: NAK, data: %Reply.ErrorCode{code: 0x04}}) do
+    device = Bus.current_device(state)
+    device = Device.reset(device)
     Bus.put_device(state, device)
   end
 
@@ -219,6 +249,14 @@ defmodule Jeff.ACU do
     reply = Reply.new(reply_message)
 
     if controlling_process do
+      if reply.name == MFGREP do
+        send(controlling_process, reply)
+      end
+
+      if reply.name == ISTATR do
+        send(controlling_process, reply)
+      end
+
       if reply.name == KEYPAD do
         event = Events.Keypress.from_reply(reply)
         send(controlling_process, event)
@@ -233,22 +271,27 @@ defmodule Jeff.ACU do
     state = handle_reply(state, reply)
 
     if command.caller do
-      GenServer.reply(command.caller, reply)
+      GenServer.reply(command.caller, {:ok, reply})
     end
 
     %{state | reply: reply}
   end
 
   defp handle_recv({:error, :timeout}, state) do
+    # Make sure to report the timeout to any potential callers
+    _ =
+      if from = get_in(state.command, [Access.key(:caller)]),
+        do: GenServer.reply(from, {:error, :timeout})
+
     %{state | reply: :timeout}
   end
 
-  defp send_data_oob(state, address, bytes) do
+  defp send_data_oob(state, address, bytes, timeout) do
     if Bus.registered?(state, address) do
       {:error, :registered}
     else
       :ok = Transport.send(state.conn, bytes)
-      Transport.recv(state.conn, @max_reply_delay)
+      Transport.recv(state.conn, timeout)
     end
   end
 

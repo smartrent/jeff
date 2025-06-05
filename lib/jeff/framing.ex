@@ -6,19 +6,20 @@ defmodule Jeff.Framing do
   Continues to accumulate bytes until the message length has been reached.
   """
 
+  require Logger
+
   @behaviour Circuits.UART.Framing
 
   @som Jeff.Message.start_of_message()
 
   defmodule State do
     @moduledoc false
-    defstruct buffer: nil, packet_length: nil, packets: []
+    defstruct buffer: nil, packet_length: nil, packets: [], trace?: false, tracer: nil
   end
 
   @impl true
-  def init(_args) do
-    state = %State{}
-    {:ok, state}
+  def init(args) do
+    {:ok, struct(State, args)}
   end
 
   @impl true
@@ -32,18 +33,18 @@ defmodule Jeff.Framing do
   end
 
   @impl true
-  def frame_timeout(_state) do
-    new_state = %State{}
-    {:ok, [], new_state}
+  def frame_timeout(state) do
+    {:ok, [], %State{trace?: state.trace?}}
   end
 
   @impl true
-  def flush(:transmit, _state), do: %State{}
-  def flush(:receive, _state), do: %State{}
-  def flush(:both, _state), do: %State{}
+  def flush(:transmit, state), do: %State{trace?: state.trace?}
+  def flush(:receive, state), do: %State{trace?: state.trace?}
+  def flush(:both, state), do: %State{trace?: state.trace?}
 
   # start a buffer after a driver byte
-  defp process_data(<<_driver::size(8), rest::binary>>, %{buffer: nil} = state) do
+  defp process_data(<<driver::binary-1, rest::binary>>, %{buffer: nil} = state) do
+    if state.trace?, do: Jeff.Tracer.log(state.tracer, :partial, driver)
     process_data(rest, %{state | buffer: <<>>})
   end
 
@@ -53,7 +54,8 @@ defmodule Jeff.Framing do
   end
 
   # ignore bytes until start of message
-  defp process_data(<<_byte, rest::binary>>, %{buffer: <<>>} = state) do
+  defp process_data(<<byte::binary-1, rest::binary>>, %{buffer: <<>>} = state) do
+    if state.trace?, do: Jeff.Tracer.log(state.tracer, :partial, byte)
     process_data(rest, state)
   end
 
@@ -69,15 +71,15 @@ defmodule Jeff.Framing do
   defp process_data(data, %{buffer: buffer, packet_length: packet_length} = state)
        when byte_size(buffer) >= packet_length do
     <<packet::binary-size(packet_length), rest::binary>> = buffer
-    state = %State{packets: state.packets ++ [packet]}
+    state = %State{packets: state.packets ++ [packet], trace?: state.trace?}
     process_data(rest <> data, state)
   end
 
   # # return when no more data to process
-  defp process_data(<<>>, %{buffer: buffer, packets: packets, packet_length: packet_length}) do
+  defp process_data(<<>>, %{buffer: buffer, packets: packets} = state) do
     case buffer do
-      nil -> {:ok, packets, %State{}}
-      partial -> {:in_frame, packets, %State{buffer: partial, packet_length: packet_length}}
+      nil -> {:ok, packets, %State{trace?: state.trace?}}
+      _partial -> {:in_frame, packets, %{state | packets: []}}
     end
   end
 

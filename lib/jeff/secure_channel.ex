@@ -1,7 +1,7 @@
 defmodule Jeff.SecureChannel do
   @moduledoc false
 
-  use Bitwise
+  import Bitwise
 
   defstruct [
     :enc,

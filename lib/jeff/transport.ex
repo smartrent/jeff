@@ -5,24 +5,21 @@ defmodule Jeff.Transport do
   alias Circuits.UART
   require Logger
 
-  @type baud() :: 9600 | 19200 | 38400 | 57600 | 115_200 | 230_400
-
-  @type args() :: [
-          port: binary(),
-          speed: baud()
-        ]
+  @type opts :: [Circuits.UART.uart_option()]
 
   @type t() :: [
+          opts: opts(),
           port: binary(),
-          speed: baud(),
           uart: pid()
         ]
 
-  defstruct port: nil, speed: nil, uart: nil
+  defstruct opts: [], port: nil, uart: nil
 
-  @spec start_link(args()) :: GenServer.on_start()
-  def start_link(init_args) do
-    Connection.start_link(__MODULE__, init_args)
+  @default_opts [active: false, speed: 9600, framing: Jeff.Framing]
+
+  @spec start_link(binary(), opts()) :: GenServer.on_start()
+  def start_link(port, opts \\ []) do
+    Connection.start_link(__MODULE__, {port, opts})
   end
 
   @spec send(GenServer.server(), binary()) :: :ok | {:error, term()}
@@ -37,20 +34,27 @@ defmodule Jeff.Transport do
   def close(conn), do: Connection.call(conn, :close)
 
   @impl Connection
-  def init(init_args) do
-    port = Keyword.fetch!(init_args, :port)
-    speed = Keyword.fetch!(init_args, :speed)
+  def init({port, opts}) do
     {:ok, uart} = UART.start_link()
 
-    s = %{port: port, speed: speed, uart: uart}
+    tracer_opts =
+      Application.get_env(:jeff, :tracer, [])
+      |> Keyword.merge(opts[:tracer] || [])
+
+    {:ok, tracer} = Jeff.Tracer.start_link(tracer_opts)
+    trace? = tracer_opts[:enabled]
+
+    opts =
+      Keyword.merge(@default_opts, opts)
+      |> Keyword.put_new(:framing, {Jeff.Framing, trace: trace?, tracer: tracer})
+
+    s = %{port: port, opts: opts, trace?: trace?, tracer: tracer, uart: uart}
 
     {:connect, :init, s}
   end
 
   @impl Connection
-  def connect(_, %{port: port, speed: speed, uart: uart} = s) do
-    opts = [speed: speed, active: false, framing: Jeff.Framing]
-
+  def connect(_, %{opts: opts, port: port, uart: uart} = s) do
     case UART.open(uart, port, opts) do
       :ok ->
         {:ok, s}
@@ -69,18 +73,21 @@ defmodule Jeff.Transport do
     _ = UART.drain(uart)
     :ok = UART.close(uart)
 
+    s = %{s | uart: nil}
+
     case info do
       {:close, from} ->
         Connection.reply(from, :ok)
+        {:stop, :normal, s}
 
       {:error, :closed} ->
         Logger.error("Serial connection closed")
+        {:connect, :reconnect, %{s | uart: nil}}
 
       {:error, reason} ->
         Logger.error("Serial connection error: #{inspect(reason)}")
+        {:connect, :reconnect, %{s | uart: nil}}
     end
-
-    {:connect, :reconnect, %{s | uart: nil}}
   end
 
   @impl Connection
@@ -90,7 +97,11 @@ defmodule Jeff.Transport do
 
   @impl Connection
   def handle_call({:send, data}, _, %{uart: uart} = s) do
-    case UART.write(uart, <<0xFF>> <> data) do
+    # Add driving byte
+    data = <<0xFF>> <> data
+    if s.trace?, do: Jeff.Tracer.log(s.tracer, :tx, data)
+
+    case UART.write(uart, data) do
       :ok ->
         {:reply, :ok, s}
 
@@ -104,7 +115,8 @@ defmodule Jeff.Transport do
       {:ok, <<>>} ->
         {:reply, {:error, :timeout}, s}
 
-      {:ok, _} = ok ->
+      {:ok, bytes} = ok ->
+        if s.trace?, do: Jeff.Tracer.log(s.tracer, :rx, bytes)
         {:reply, ok, s}
 
       {:error, _} = error ->
@@ -114,6 +126,34 @@ defmodule Jeff.Transport do
 
   def handle_call(:close, from, s) do
     {:disconnect, {:close, from}, s}
+  end
+
+  def handle_call({:set_trace, val, opts}, _from, %{trace?: val} = state) do
+    # noop
+    :ok = GenServer.call(state.tracer, {:configure, opts})
+    {:reply, :ok, state}
+  end
+
+  def handle_call({:set_trace, val, opts}, _from, state) do
+    # force as boolean
+    enabled? = val == true || false
+    frame_opts = [trace?: enabled?, tracer: state.tracer]
+
+    framing =
+      case state.opts[:framing] do
+        nil -> {Jeff.Framing, frame_opts}
+        {mod, old} -> {mod, Keyword.merge(old, frame_opts)}
+        mod -> {mod, frame_opts}
+      end
+
+    case UART.configure(state.uart, framing: framing) do
+      :ok ->
+        :ok = GenServer.call(state.tracer, {:configure, opts})
+        {:reply, :ok, %{state | trace?: enabled?}}
+
+      err ->
+        {:reply, err, state}
+    end
   end
 
   defp log_connect_error(reason, port, uart) do

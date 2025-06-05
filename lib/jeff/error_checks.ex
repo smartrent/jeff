@@ -1,7 +1,7 @@
 defmodule Jeff.ErrorChecks do
   @moduledoc false
 
-  use Bitwise
+  import Bitwise
 
   @spec crc(binary()) :: pos_integer()
   def crc(data) when is_binary(data) do

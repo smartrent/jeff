@@ -42,6 +42,16 @@ defmodule Jeff.Device do
     %{device | sequence: next_sequence(n)}
   end
 
+  @doc """
+  Resets communication with a PD by setting the sequence number to 0 and resetting
+  the secure channel state. Useful when a communication with a PD gets out of sync,
+  such as when the PD reboots.
+  """
+  @spec reset(t()) :: t()
+  def reset(device) do
+    %{device | sequence: 0, last_valid_reply: 0, secure_channel: SecureChannel.new()}
+  end
+
   @spec receive_valid_reply(t()) :: t()
   def receive_valid_reply(device) do
     device |> maybe_set_last_valid_reply() |> inc_sequence()
@@ -69,11 +79,6 @@ defmodule Jeff.Device do
   end
 
   @spec next_command(t()) :: {t(), Command.t()}
-  def next_command(%{sequence: 0, address: address} = device) do
-    command = Command.new(address, POLL)
-    {device, command}
-  end
-
   def next_command(
         %{security?: true, secure_channel: %{initialized?: false}, address: address} = device
       ) do

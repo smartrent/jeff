@@ -31,7 +31,7 @@ defmodule Jeff.Reply do
   | XRD       | 0xB1 | Extended Read Response                     | APDU and details |
   """
 
-  use Bitwise
+  import Bitwise
 
   alias Jeff.Reply.{
     Capabilities,
@@ -41,8 +41,11 @@ defmodule Jeff.Reply do
     ErrorCode,
     FileTransferStatus,
     IdReport,
+    InputStatus,
     KeypadData,
-    LocalStatus
+    LocalStatus,
+    MfgReply,
+    OutputStatus
   }
 
   @type t() :: %__MODULE__{
@@ -122,10 +125,13 @@ defmodule Jeff.Reply do
   defp decode(PDID, data), do: IdReport.decode(data)
   defp decode(PDCAP, data), do: Capabilities.decode(data)
   defp decode(LSTATR, data), do: LocalStatus.decode(data)
+  defp decode(ISTATR, data), do: InputStatus.decode(data)
+  defp decode(OSTATR, data), do: OutputStatus.decode(data)
   defp decode(COM, data), do: ComData.decode(data)
   defp decode(KEYPAD, data), do: KeypadData.decode(data)
   defp decode(RAW, data), do: CardData.decode(data)
   defp decode(CCRYPT, data), do: EncryptionClient.decode(data)
+  defp decode(MFGREP, data), do: MfgReply.decode(data)
   defp decode(RMAC_I, data), do: data
   defp decode(FTSTAT, data), do: FileTransferStatus.decode(data)
   defp decode(_name, nil), do: nil
