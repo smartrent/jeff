@@ -9,6 +9,7 @@ defmodule Jeff do
   alias Jeff.MFG.Encoder
   alias Jeff.Reply
   alias Jeff.Reply.ErrorCode
+  alias Jeff.{ACU, Command, Command.FileTransfer, Device, Reply}
 
   @type acu() :: GenServer.server()
   @type device_opt() :: ACU.device_opt()
@@ -172,6 +173,33 @@ defmodule Jeff do
 
   def mfg(acu, address, params) when is_list(params) do
     ACU.send_command(acu, address, MFG, params) |> handle_reply()
+  end
+
+  @doc """
+  Send file data to a PD
+  """
+  @spec file_transfer(acu(), osdp_address(), binary()) ::
+          Reply.FileTransferStatus.t() | Reply.ErrorCode.t()
+  def file_transfer(acu, address, data) when is_binary(data) do
+    with %{name: PDCAP, data: caps} <- ACU.send_command(acu, address, CAP) do
+      max = caps[:receive_buffer_size] || 128
+
+      FileTransfer.command_set(data, max)
+      |> run_file_transfer(acu, address)
+    end
+  end
+
+  defp run_file_transfer([cmd | rem], acu, address) do
+    ACU.send_command(acu, address, FILETRANSFER, Map.to_list(cmd))
+    |> FileTransfer.adjust_from_reply(rem)
+    |> case do
+      {:cont, next, delay} ->
+        :timer.sleep(delay)
+        run_file_transfer(next, acu, address)
+
+      {:halt, data} ->
+        data
+    end
   end
 
   defp handle_reply({:ok, %{data: %ErrorCode{code: code} = data}}) when code > 0,
