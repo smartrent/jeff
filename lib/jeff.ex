@@ -3,7 +3,13 @@ defmodule Jeff do
   Control an Access Control Unit (ACU) and send commands to a Peripheral Device (PD)
   """
 
-  alias Jeff.{ACU, Command, Command.FileTransfer, Device, Reply}
+  alias Jeff.ACU
+  alias Jeff.Command
+  alias Jeff.Command.FileTransfer
+  alias Jeff.Device
+  alias Jeff.MFG.Encoder
+  alias Jeff.Reply
+  alias Jeff.Reply.ErrorCode
 
   @type acu() :: GenServer.server()
   @type device_opt() :: ACU.device_opt()
@@ -134,6 +140,100 @@ defmodule Jeff do
   @spec set_com(acu(), osdp_address(), [Command.ComSettings.param()]) ::
           Reply.ComData.t() | cmd_err()
   def set_com(acu, address, params) do
-    ACU.send_command(acu, address, COMSET, params).data
+    ACU.send_command(acu, address, COMSET, params) |> handle_reply()
   end
+
+  @doc """
+  Instructs the PD to reply with an input status report.
+  """
+  @spec input_status(acu(), osdp_address()) :: Reply.InputStatus.t() | cmd_err()
+  def input_status(acu, address) do
+    ACU.send_command(acu, address, ISTAT) |> handle_reply()
+  end
+
+  @doc """
+  Instructs the PD to reply with an output status report.
+  """
+  @spec output_status(acu(), osdp_address()) :: Reply.OutputStatus.t() | cmd_err()
+  def output_status(acu, address) do
+    ACU.send_command(acu, address, OSTAT) |> handle_reply()
+  end
+
+  @doc """
+  Sends a manufacturer-specific command to the PD.
+  """
+  @spec mfg(acu(), osdp_address(), Encoder.t() | [Command.Mfg.param()]) ::
+          Reply.MfgReply.t() | cmd_err()
+  def mfg(acu, address, mfg_command) when is_struct(mfg_command) do
+    vendor_code = Encoder.vendor_code(mfg_command)
+    data = Encoder.encode(mfg_command)
+
+    mfg(acu, address, vendor_code: vendor_code, data: data)
+  end
+
+  def mfg(acu, address, params) when is_list(params) do
+    ACU.send_command(acu, address, MFG, params) |> handle_reply()
+  end
+
+  @doc """
+  Send file data to a PD
+  """
+  @spec file_transfer(acu(), osdp_address(), binary()) ::
+          Reply.FileTransferStatus.t() | Reply.ErrorCode.t()
+  def file_transfer(acu, address, data) when is_binary(data) do
+    file_transfer(acu, address, data, nil)
+  end
+
+  @spec file_transfer(acu(), osdp_address(), binary(), function() | nil) ::
+          Reply.FileTransferStatus.t() | Reply.ErrorCode.t()
+  def file_transfer(acu, address, data, progress_callback) when is_binary(data) do
+    with %{name: PDCAP, data: _caps} <- ACU.send_command(acu, address, CAP) do
+      max = 128
+      # ceiling division
+      total_packets = div(byte_size(data) + max - 1, max)
+
+      FileTransfer.command_set(data, max)
+      |> run_file_transfer(acu, address, progress_callback, 0, total_packets)
+    end
+  end
+
+  defp run_file_transfer([cmd | rem], acu, address, progress_callback, packet_num, total_packets) do
+    ACU.send_command(acu, address, FILETRANSFER, Map.to_list(cmd))
+    |> FileTransfer.adjust_from_reply(rem)
+    |> case do
+      {:cont, next, delay} ->
+        # Call progress callback if provided
+        if progress_callback do
+          progress_percentage = round((packet_num + 1) * 100 / total_packets)
+          progress_callback.(packet_num + 1, total_packets, progress_percentage)
+        end
+
+        :timer.sleep(delay)
+        run_file_transfer(next, acu, address, progress_callback, packet_num + 1, total_packets)
+
+      {:halt, data} ->
+        # Call final progress callback
+        if progress_callback do
+          progress_callback.(total_packets, total_packets, 100)
+        end
+
+        data
+    end
+  end
+
+  defp run_file_transfer([], _acu, _address, progress_callback, _packet_num, total_packets) do
+    # Handle empty list case
+    if progress_callback do
+      progress_callback.(total_packets, total_packets, 100)
+    end
+
+    # Return success status
+    %Reply.FileTransferStatus{}
+  end
+
+  defp handle_reply({:ok, %{data: %ErrorCode{code: code} = data}}) when code > 0,
+    do: {:error, data}
+
+  defp handle_reply({:ok, %{data: data}}), do: data
+  defp handle_reply(err), do: err
 end
