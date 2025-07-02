@@ -123,7 +123,6 @@ defmodule Jeff.Command.FileTransfer do
 
   defp chunk_data(data, base, _max, acc) do
     frag_size = byte_size(data)
-    # cmd = new(total_size: total, data: data, fragment_size: frag_size, offset: o + frag_size)
     cmd = %{base | data: data, fragment_size: frag_size, offset: next_offset(base, acc)}
     Enum.reverse([cmd | acc])
   end

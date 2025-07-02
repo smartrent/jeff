@@ -3,6 +3,12 @@ defmodule Jeff do
   Control an Access Control Unit (ACU) and send commands to a Peripheral Device (PD)
   """
 
+  alias Jeff.ACU
+  alias Jeff.Command
+  alias Jeff.Device
+  alias Jeff.MFG.Encoder
+  alias Jeff.Reply
+  alias Jeff.Reply.ErrorCode
   alias Jeff.{ACU, Command, Command.FileTransfer, Device, Reply}
 
   @type acu() :: GenServer.server()
@@ -134,6 +140,125 @@ defmodule Jeff do
   @spec set_com(acu(), osdp_address(), [Command.ComSettings.param()]) ::
           Reply.ComData.t() | cmd_err()
   def set_com(acu, address, params) do
-    ACU.send_command(acu, address, COMSET, params).data
+    ACU.send_command(acu, address, COMSET, params) |> handle_reply()
   end
+
+  @doc """
+  Instructs the PD to reply with an input status report.
+  """
+  @spec input_status(acu(), osdp_address()) :: Reply.InputStatus.t() | cmd_err()
+  def input_status(acu, address) do
+    ACU.send_command(acu, address, ISTAT) |> handle_reply()
+  end
+
+  @doc """
+  Instructs the PD to reply with an output status report.
+  """
+  @spec output_status(acu(), osdp_address()) :: Reply.OutputStatus.t() | cmd_err()
+  def output_status(acu, address) do
+    ACU.send_command(acu, address, OSTAT) |> handle_reply()
+  end
+
+  @doc """
+  Sends a manufacturer-specific command to the PD.
+  """
+  @spec mfg(acu(), osdp_address(), Encoder.t() | [Command.Mfg.param()]) ::
+          Reply.MfgReply.t() | cmd_err()
+  def mfg(acu, address, mfg_command) when is_struct(mfg_command) do
+    vendor_code = Encoder.vendor_code(mfg_command)
+    data = Encoder.encode(mfg_command)
+
+    mfg(acu, address, vendor_code: vendor_code, data: data)
+  end
+
+  def mfg(acu, address, params) when is_list(params) do
+    ACU.send_command(acu, address, MFG, params) |> handle_reply()
+  end
+
+  @doc """
+  Send file data to a PD
+  """
+  @spec file_transfer(acu(), osdp_address(), binary()) ::
+          Reply.FileTransferStatus.t() | Reply.ErrorCode.t()
+  def file_transfer(acu, address, data) when is_binary(data) do
+    file_transfer(acu, address, data, nil)
+  end
+
+  @spec file_transfer(acu(), osdp_address(), binary(), function() | nil) ::
+          Reply.FileTransferStatus.t() | Reply.ErrorCode.t()
+  def file_transfer(acu, address, data, progress_callback) when is_binary(data) do
+    case ACU.send_command(acu, address, CAP) |> handle_reply() do
+      caps when is_map(caps) ->
+        # max is 128 only for now, anything else times out
+        max = 128
+        total_packets = div(byte_size(data) + max - 1, max)
+
+        FileTransfer.command_set(data, max)
+        |> run_file_transfer(acu, address, progress_callback, 0, total_packets)
+
+      error ->
+        error
+    end
+  end
+
+  defp run_file_transfer([cmd | rem], acu, address, progress_callback, packet_num, total_packets) do
+    case ACU.send_command(acu, address, FILETRANSFER, Map.to_list(cmd)) do
+      {:ok, reply} ->
+        handle_file_transfer_reply(
+          reply,
+          rem,
+          acu,
+          address,
+          progress_callback,
+          packet_num,
+          total_packets
+        )
+
+      error ->
+        error
+    end
+  end
+
+  defp run_file_transfer([], _acu, _address, progress_callback, _packet_num, total_packets) do
+    # Handle empty list case
+    if progress_callback do
+      progress_callback.(total_packets, total_packets, 100)
+    end
+
+    %Reply.FileTransferStatus{status: :ok}
+  end
+
+  defp handle_file_transfer_reply(
+         reply,
+         rem,
+         acu,
+         address,
+         progress_callback,
+         packet_num,
+         total_packets
+       ) do
+    case FileTransfer.adjust_from_reply(reply, rem) do
+      {:cont, next, delay} ->
+        call_progress_callback(progress_callback, packet_num + 1, total_packets)
+        :timer.sleep(delay)
+        run_file_transfer(next, acu, address, progress_callback, packet_num + 1, total_packets)
+
+      {:halt, data} ->
+        call_progress_callback(progress_callback, total_packets, total_packets)
+        data
+    end
+  end
+
+  defp call_progress_callback(nil, _packet_num, _total_packets), do: :ok
+
+  defp call_progress_callback(progress_callback, packet_num, total_packets) do
+    progress_percentage = round(packet_num * 100 / total_packets)
+    progress_callback.(packet_num, total_packets, progress_percentage)
+  end
+
+  defp handle_reply({:ok, %{data: %ErrorCode{code: code} = data}}) when code > 0,
+    do: {:error, data}
+
+  defp handle_reply({:ok, %{data: data}}), do: data
+  defp handle_reply(err), do: err
 end
