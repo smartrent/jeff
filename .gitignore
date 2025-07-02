@@ -24,3 +24,6 @@ jeff-*.tar
 
 # Temporary files, for example, from tests.
 /tmp/
+
+# Ignore mise files
+.mise.toml
