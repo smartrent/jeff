@@ -179,45 +179,49 @@ defmodule Jeff do
   Send file data to a PD
   """
   @spec file_transfer(acu(), osdp_address(), binary()) ::
-          Reply.FileTransferStatus.t() | Reply.ErrorCode.t()
+          Reply.FileTransferStatus.t()
+          | Reply.ErrorCode.t()
+          | {:error, :timeout}
+          | {:ok, Reply.t()}
   def file_transfer(acu, address, data) when is_binary(data) do
     file_transfer(acu, address, data, nil)
   end
 
   @spec file_transfer(acu(), osdp_address(), binary(), function() | nil) ::
-          Reply.FileTransferStatus.t() | Reply.ErrorCode.t()
+          Reply.FileTransferStatus.t()
+          | Reply.ErrorCode.t()
+          | {:error, :timeout}
+          | {:ok, Reply.t()}
   def file_transfer(acu, address, data, progress_callback) when is_binary(data) do
-    with %{name: PDCAP, data: _caps} <- ACU.send_command(acu, address, CAP) do
-      max = 128
-      # ceiling division
-      total_packets = div(byte_size(data) + max - 1, max)
+    case ACU.send_command(acu, address, CAP) do
+      {:ok, %{name: PDCAP, data: _caps}} ->
+        max = 128
+        total_packets = div(byte_size(data) + max - 1, max)
 
-      FileTransfer.command_set(data, max)
-      |> run_file_transfer(acu, address, progress_callback, 0, total_packets)
+        FileTransfer.command_set(data, max)
+        |> run_file_transfer(acu, address, progress_callback, 0, total_packets)
+
+      {:ok, reply} ->
+        {:ok, reply}
+
+      error ->
+        error
     end
   end
 
   defp run_file_transfer([cmd | rem], acu, address, progress_callback, packet_num, total_packets) do
-    ACU.send_command(acu, address, FILETRANSFER, Map.to_list(cmd))
-    |> FileTransfer.adjust_from_reply(rem)
-    |> case do
-      {:cont, next, delay} ->
-        # Call progress callback if provided
-        if progress_callback do
-          progress_percentage = round((packet_num + 1) * 100 / total_packets)
-          progress_callback.(packet_num + 1, total_packets, progress_percentage)
-        end
-
-        :timer.sleep(delay)
-        run_file_transfer(next, acu, address, progress_callback, packet_num + 1, total_packets)
-
+    with {:ok, reply} <- ACU.send_command(acu, address, FILETRANSFER, Map.to_list(cmd)),
+         {:cont, next, delay} <- FileTransfer.adjust_from_reply(reply, rem) do
+      call_progress_callback(progress_callback, packet_num + 1, total_packets)
+      :timer.sleep(delay)
+      run_file_transfer(next, acu, address, progress_callback, packet_num + 1, total_packets)
+    else
       {:halt, data} ->
-        # Call final progress callback
-        if progress_callback do
-          progress_callback.(total_packets, total_packets, 100)
-        end
-
+        call_progress_callback(progress_callback, total_packets, total_packets)
         data
+
+      {:error, _reason} = error ->
+        error
     end
   end
 
@@ -227,8 +231,14 @@ defmodule Jeff do
       progress_callback.(total_packets, total_packets, 100)
     end
 
-    # Return success status
     %Reply.FileTransferStatus{}
+  end
+
+  defp call_progress_callback(nil, _current, _total), do: :ok
+
+  defp call_progress_callback(callback, current, total) do
+    progress_percentage = round(current * 100 / total)
+    callback.(current, total, progress_percentage)
   end
 
   defp handle_reply({:ok, %{data: %ErrorCode{code: code} = data}}) when code > 0,
