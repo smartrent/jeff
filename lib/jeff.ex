@@ -18,6 +18,7 @@ defmodule Jeff do
 
   @type cmd_err :: {:error, :timeout | ErrorCode.t()}
 
+  @osdp_max_packet_size 128
   @doc """
   Enable OSDP packet tracing
 
@@ -179,26 +180,18 @@ defmodule Jeff do
   Send file data to a PD
   """
   @spec file_transfer(acu(), osdp_address(), binary()) ::
-          Reply.FileTransferStatus.t() | Reply.ErrorCode.t()
+          Reply.FileTransferStatus.t() | cmd_err()
   def file_transfer(acu, address, data) when is_binary(data) do
     file_transfer(acu, address, data, nil)
   end
 
   @spec file_transfer(acu(), osdp_address(), binary(), function() | nil) ::
-          Reply.FileTransferStatus.t() | Reply.ErrorCode.t()
+          Reply.FileTransferStatus.t() | cmd_err()
   def file_transfer(acu, address, data, progress_callback) when is_binary(data) do
-    case ACU.send_command(acu, address, CAP) |> handle_reply() do
-      caps when is_map(caps) ->
-        # max is 128 only for now, anything else times out
-        max = 128
-        total_packets = div(byte_size(data) + max - 1, max)
+    total_packets = div(byte_size(data) + @osdp_max_packet_size - 1, @osdp_max_packet_size)
 
-        FileTransfer.command_set(data, max)
-        |> run_file_transfer(acu, address, progress_callback, 0, total_packets)
-
-      error ->
-        error
-    end
+    FileTransfer.command_set(data, @osdp_max_packet_size)
+    |> run_file_transfer(acu, address, progress_callback, 0, total_packets)
   end
 
   defp run_file_transfer([cmd | rem], acu, address, progress_callback, packet_num, total_packets) do
