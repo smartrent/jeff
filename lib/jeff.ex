@@ -9,6 +9,7 @@ defmodule Jeff do
   alias Jeff.MFG.Encoder
   alias Jeff.Reply
   alias Jeff.Reply.ErrorCode
+  alias Jeff.{ACU, Command, Command.FileTransfer, Device, Reply}
 
   @type acu() :: GenServer.server()
   @type device_opt() :: ACU.device_opt()
@@ -17,6 +18,7 @@ defmodule Jeff do
 
   @type cmd_err :: {:error, :timeout | ErrorCode.t()}
 
+  @osdp_max_packet_size 128
   @doc """
   Enable OSDP packet tracing
 
@@ -173,6 +175,87 @@ defmodule Jeff do
   def mfg(acu, address, params) when is_list(params) do
     ACU.send_command(acu, address, MFG, params) |> handle_reply()
   end
+
+  @doc """
+  Send file data to a PD
+  """
+  @spec file_transfer(acu(), osdp_address(), binary()) ::
+          Reply.FileTransferStatus.t() | cmd_err()
+  def file_transfer(acu, address, data) when is_binary(data) do
+    print_progress_callback = fn num, total, percent ->
+      {:ok, cols} = :io.columns()
+      total_cols = round(cols * 0.7)
+      progress_len = round(total_cols * (num / total))
+      progress = :binary.copy("=", progress_len)
+      trailing = :binary.copy(" ", total_cols - progress_len)
+      result = "\r[#{progress}#{trailing}] #{num}/#{total} (%#{percent})"
+      if num == total, do: IO.puts(result), else: IO.write(result)
+    end
+
+    file_transfer(acu, address, data, print_progress_callback)
+  end
+
+  @spec file_transfer(acu(), osdp_address(), binary(), function() | nil) ::
+          Reply.FileTransferStatus.t() | cmd_err()
+  def file_transfer(acu, address, data, progress_callback) when is_binary(data) do
+    commands = FileTransfer.command_set(data, @osdp_max_packet_size)
+    total_packets = length(commands)
+
+    case commands do
+      [] ->
+        %Reply.FileTransferStatus{status: :malformed}
+
+      _ ->
+        call_progress_callback(progress_callback, 0, total_packets)
+        run_file_transfer(commands, acu, address, progress_callback, total_packets)
+    end
+  end
+
+  defp run_file_transfer([cmd | rem], acu, address, progress_callback, total_packets) do
+    case ACU.send_command(acu, address, FILETRANSFER, Map.to_list(cmd)) do
+      {:ok, reply} ->
+        handle_file_transfer_reply(
+          reply,
+          rem,
+          acu,
+          address,
+          progress_callback,
+          total_packets
+        )
+
+      error ->
+        error
+    end
+  end
+
+  defp handle_file_transfer_reply(
+         reply,
+         rem,
+         acu,
+         address,
+         progress_callback,
+         total_packets
+       ) do
+    case FileTransfer.adjust_from_reply(reply, rem) do
+      {:cont, next, delay} ->
+        packet_num = total_packets - length(next)
+        call_progress_callback(progress_callback, packet_num, total_packets)
+        :timer.sleep(delay)
+        run_file_transfer(next, acu, address, progress_callback, total_packets)
+
+      {:halt, data} ->
+        call_progress_callback(progress_callback, total_packets - length(rem), total_packets)
+        data
+    end
+  end
+
+  defp call_progress_callback(progress_callback, packet_num, total_packets)
+       when is_function(progress_callback, 3) do
+    progress_percentage = round(packet_num * 100 / total_packets)
+    progress_callback.(packet_num, total_packets, progress_percentage)
+  end
+
+  defp call_progress_callback(_progress_callback, _packet_num, _total_packets), do: :ok
 
   defp handle_reply({:ok, %{data: %ErrorCode{code: code} = data}}) when code > 0,
     do: {:error, data}
