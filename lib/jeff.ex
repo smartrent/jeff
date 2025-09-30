@@ -188,10 +188,10 @@ defmodule Jeff do
   @spec file_transfer(acu(), osdp_address(), binary(), function() | nil) ::
           Reply.FileTransferStatus.t() | cmd_err()
   def file_transfer(acu, address, data, progress_callback) when is_binary(data) do
-    total_packets = div(byte_size(data) + @osdp_max_packet_size - 1, @osdp_max_packet_size)
+    commands = FileTransfer.command_set(data, @osdp_max_packet_size)
+    total_packets = length(commands)
 
-    FileTransfer.command_set(data, @osdp_max_packet_size)
-    |> run_file_transfer(acu, address, progress_callback, 0, total_packets)
+    run_file_transfer(commands, acu, address, progress_callback, 0, total_packets)
   end
 
   defp run_file_transfer([cmd | rem], acu, address, progress_callback, packet_num, total_packets) do
