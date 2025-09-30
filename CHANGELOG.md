@@ -1,3 +1,9 @@
+## [v0.5.2] - 2025-09-30
+
+### Added
+
+- OSDP file transfer command support (#42)
+
 ## [v0.5.1] - 2023-05-08
 
 ### Added
