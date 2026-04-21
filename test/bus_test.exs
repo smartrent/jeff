@@ -53,6 +53,36 @@ defmodule BusTest do
     assert bus.reply == reply
   end
 
+  test "valid reply advances device sequence number" do
+    address = 0x01
+    bus = Bus.new() |> Bus.add_device(address: address)
+    assert Bus.get_device(bus, address).sequence == 0
+
+    bus = bus |> Bus.tick() |> Bus.tick() |> Bus.tick()
+    bus = Bus.receive_reply(bus, Reply.new(address, ACK))
+    bus = Bus.tick(bus)
+
+    assert Bus.get_device(bus, address).sequence == 1
+  end
+
+  test "bad_frame reply does not advance device sequence number" do
+    address = 0x01
+    bus = Bus.new() |> Bus.add_device(address: address)
+
+    # complete a normal cycle to get sequence to a known non-zero value
+    bus = bus |> Bus.tick() |> Bus.tick() |> Bus.tick()
+    bus = Bus.receive_reply(bus, Reply.new(address, ACK))
+    bus = Bus.tick(bus)
+    assert Bus.get_device(bus, address).sequence == 1
+
+    # simulate a bad_frame on the next cycle
+    bus = bus |> Bus.tick() |> Bus.tick() |> Bus.tick()
+    bus = %{bus | reply: :bad_frame}
+    bus = Bus.tick(bus)
+
+    assert Bus.get_device(bus, address).sequence == 1
+  end
+
   test "tick" do
     bus = Bus.new()
     bus = Bus.add_device(bus, address: 0x1)

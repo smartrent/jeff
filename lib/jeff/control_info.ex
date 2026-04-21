@@ -35,7 +35,7 @@ defmodule Jeff.ControlInfo do
 
   def decode(byte) when is_integer(byte) do
     <<
-      0::size(4),
+      _::size(4),
       security?::size(1),
       check_scheme::size(1),
       sequence::size(2)

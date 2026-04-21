@@ -98,6 +98,7 @@ defmodule Jeff.Bus do
   end
 
   defp maybe_validate_reply(%{reply: :timeout} = bus), do: bus
+  defp maybe_validate_reply(%{reply: :bad_frame} = bus), do: bus
 
   defp maybe_validate_reply(bus) do
     device = current_device(bus) |> Device.receive_valid_reply()

@@ -34,13 +34,13 @@ defmodule Jeff.Framing do
 
   @impl true
   def frame_timeout(state) do
-    {:ok, [], %State{trace?: state.trace?}}
+    {:ok, [], clean_state(state)}
   end
 
   @impl true
-  def flush(:transmit, state), do: %State{trace?: state.trace?}
-  def flush(:receive, state), do: %State{trace?: state.trace?}
-  def flush(:both, state), do: %State{trace?: state.trace?}
+  def flush(:transmit, state), do: clean_state(state)
+  def flush(:receive, state), do: clean_state(state)
+  def flush(:both, state), do: clean_state(state)
 
   # start a buffer after a driver byte
   defp process_data(<<driver::binary-1, rest::binary>>, %{buffer: nil} = state) do
@@ -71,14 +71,14 @@ defmodule Jeff.Framing do
   defp process_data(data, %{buffer: buffer, packet_length: packet_length} = state)
        when byte_size(buffer) >= packet_length do
     <<packet::binary-size(packet_length), rest::binary>> = buffer
-    state = %State{packets: state.packets ++ [packet], trace?: state.trace?}
+    state = %{clean_state(state) | packets: state.packets ++ [packet]}
     process_data(rest <> data, state)
   end
 
   # # return when no more data to process
   defp process_data(<<>>, %{buffer: buffer, packets: packets} = state) do
     case buffer do
-      nil -> {:ok, packets, %State{trace?: state.trace?}}
+      nil -> {:ok, packets, clean_state(state)}
       _partial -> {:in_frame, packets, %{state | packets: []}}
     end
   end
@@ -87,4 +87,6 @@ defmodule Jeff.Framing do
   defp process_data(data, %{buffer: buffer} = state) do
     process_data(<<>>, %{state | buffer: buffer <> data})
   end
+
+  defp clean_state(state), do: %State{trace?: state.trace?, tracer: state.tracer}
 end

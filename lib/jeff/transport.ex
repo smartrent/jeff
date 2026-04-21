@@ -113,6 +113,9 @@ defmodule Jeff.Transport do
   def handle_call({:recv, timeout}, _, %{uart: uart} = s) do
     case UART.read(uart, timeout) do
       {:ok, <<>>} ->
+        # Flush the receive buffer so any partial frame bytes accumulated during
+        # this timeout don't corrupt the next poll cycle's framing state.
+        _ = UART.flush(uart, :receive)
         {:reply, {:error, :timeout}, s}
 
       {:ok, bytes} = ok ->

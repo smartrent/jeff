@@ -49,4 +49,31 @@ defmodule FramingTest do
     assert Framing.remove_framing(data, new_state) ==
              {:in_frame, [packet], %Framing.State{buffer: partial_packet, packet_length: 8}}
   end
+
+  test "flush :receive discards partial buffer" do
+    # Transport calls UART.flush(uart, :receive) on poll timeout so that a partial
+    # frame accumulated from a garbled reply can't corrupt the next poll cycle.
+    partial_state = %Framing.State{buffer: <<0x53, 0x7F, 0x06, 0x00>>, packet_length: 6}
+    clean_state = Framing.flush(:receive, partial_state)
+    assert clean_state.buffer == nil
+    assert clean_state.packet_length == nil
+    assert clean_state.packets == []
+  end
+
+  test "flush :receive preserves tracer configuration" do
+    # If trace? is true but tracer is dropped, the next partial-byte log crashes.
+    tracer = self()
+
+    partial_state = %Framing.State{
+      buffer: <<0x53, 0x7F, 0x06, 0x00>>,
+      packet_length: 6,
+      trace?: true,
+      tracer: tracer
+    }
+
+    clean_state = Framing.flush(:receive, partial_state)
+    assert clean_state.buffer == nil
+    assert clean_state.trace? == true
+    assert clean_state.tracer == tracer
+  end
 end

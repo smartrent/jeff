@@ -87,4 +87,13 @@ defmodule MessageTest do
   test "decode message with mac" do
     _message = Message.decode(<<83, 129, 14, 0, 15, 2, 22, 64, 12, 73, 225, 102, 51, 242>>)
   end
+
+  test "decode tolerates non-zero reserved bits in control byte" do
+    # Reproduces the crash seen when a peripheral sends 0x53 (the OSDP SOM byte)
+    # as the control info byte. The upper 4 bits are reserved and must be ignored.
+    # Frame: SOM | addr | len(2) | ctrl | code | check
+    # 0x53 as ctrl: reserved=0101, security?=0, check_scheme=checksum, seq=3
+    bytes = <<0x53, 0x01, 0x08, 0x00, 0x53, 0x40, 0x00, 0x00>>
+    assert %Message{} = Message.decode(bytes)
+  end
 end

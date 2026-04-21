@@ -220,8 +220,38 @@ defmodule Jeff.ACU do
 
   defp handle_reply(state, _reply), do: state
 
-  defp handle_recv(
-         {:ok, bytes},
+  defp handle_recv({:ok, bytes}, state) do
+    do_handle_recv(bytes, state)
+  rescue
+    e ->
+      Logger.warning("Jeff dropping malformed OSDP frame: #{Exception.message(e)}")
+
+      if from = get_in(state.command, [Access.key(:caller)]),
+        do: GenServer.reply(from, {:error, :bad_frame})
+
+      %{state | reply: :bad_frame}
+  end
+
+  defp handle_recv({:error, :timeout}, state) do
+    # Make sure to report the timeout to any potential callers
+    _ =
+      if from = get_in(state.command, [Access.key(:caller)]),
+        do: GenServer.reply(from, {:error, :timeout})
+
+    %{state | reply: :timeout}
+  end
+
+  defp handle_recv({:error, reason}, state) do
+    Logger.warning("Jeff transport error: #{inspect(reason)}")
+
+    if from = get_in(state.command, [Access.key(:caller)]),
+      do: GenServer.reply(from, {:error, reason})
+
+    %{state | reply: :bad_frame}
+  end
+
+  defp do_handle_recv(
+         bytes,
          %{controlling_process: controlling_process, command: command} = state
        ) do
     reply_message = Message.decode(bytes)
@@ -275,15 +305,6 @@ defmodule Jeff.ACU do
     end
 
     %{state | reply: reply}
-  end
-
-  defp handle_recv({:error, :timeout}, state) do
-    # Make sure to report the timeout to any potential callers
-    _ =
-      if from = get_in(state.command, [Access.key(:caller)]),
-        do: GenServer.reply(from, {:error, :timeout})
-
-    %{state | reply: :timeout}
   end
 
   defp send_data_oob(state, address, bytes, timeout) do
