@@ -29,8 +29,8 @@ defmodule Jeff.Reply.IdReport do
       fw_build
     >> = data
 
-    vendor = [vendor1, vendor2, vendor3] |> Enum.map_join(&hex/1)
-    serial = hex(serial) |> String.pad_leading(8, "0")
+    vendor = [vendor1, vendor2, vendor3] |> Enum.map_join(&hex(&1, 2))
+    serial = hex(serial, 8)
     firmware = "#{fw_major}.#{fw_minor}.#{fw_build}"
 
     %__MODULE__{
@@ -42,5 +42,5 @@ defmodule Jeff.Reply.IdReport do
     }
   end
 
-  defp hex(i), do: Integer.to_string(i, 16)
+  defp hex(i, length), do: Integer.to_string(i, 16) |> String.pad_leading(length, "0")
 end

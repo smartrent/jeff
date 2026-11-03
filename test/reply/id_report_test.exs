@@ -16,4 +16,14 @@ defmodule ReplyIdReportTest do
 
     assert actual == expected
   end
+
+  test "vendor codes with leading zeroes get padded" do
+    leading_zeroes = IdReport.decode(<<1, 1, 1, 48, 1, 100, 106, 61, 0, 4, 8, 1>>)
+    all_zeroes = IdReport.decode(<<0, 0, 0, 48, 1, 100, 106, 61, 0, 4, 8, 1>>)
+    intermittent_zeroes = IdReport.decode(<<0, 16, 1, 48, 1, 100, 106, 61, 0, 4, 8, 1>>)
+
+    assert leading_zeroes.vendor == "010101"
+    assert all_zeroes.vendor == "000000"
+    assert intermittent_zeroes.vendor == "001001"
+  end
 end
