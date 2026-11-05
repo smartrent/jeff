@@ -211,12 +211,8 @@ defmodule Jeff.ACU do
     Bus.put_device(state, device)
   end
 
-  # NAK - unexpected sequence number
-  defp handle_reply(state, %{name: NAK, data: %Reply.ErrorCode{code: 0x04}}) do
-    device = Bus.current_device(state)
-    device = Device.reset(device)
-    Bus.put_device(state, device)
-  end
+  # NAK 0x04 (unexpected sequence number) is handled in Bus.tick/1, which resets
+  # the device to sequence 0 without counting the NAK as a valid reply.
 
   defp handle_reply(state, _reply), do: state
 
