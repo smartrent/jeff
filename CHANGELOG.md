@@ -1,3 +1,11 @@
+## Unreleased
+
+### Fixed
+
+- After a NAK for an unexpected sequence number (error code 0x04), the next
+  command to that PD is now sent with sequence number 0. Previously the reset
+  was undone in the same tick, so the PD was never re-synchronized (CB-310)
+
 ## [v0.5.2] - 2025-09-30
 
 ### Added
