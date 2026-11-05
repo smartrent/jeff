@@ -78,7 +78,11 @@ defmodule Jeff.Bus do
   end
 
   def tick(%{command: nil} = bus) do
-    {device, command} = current_device(bus) |> Device.next_command()
+    {device, command} =
+      current_device(bus)
+      |> Device.maybe_reset_offline()
+      |> Device.next_command()
+
     bus = register(bus, device)
     %{bus | command: command}
   end
@@ -98,16 +102,23 @@ defmodule Jeff.Bus do
     %{bus | command: nil, cursor: nil, reply: nil}
   end
 
-  defp maybe_validate_reply(%{reply: :timeout} = bus), do: bus
+  defp maybe_validate_reply(%{reply: :timeout} = bus) do
+    device = current_device(bus) |> Device.receive_timeout()
+    register(bus, device)
+  end
 
   # NAK - unexpected sequence number. The PD has lost sync (e.g. it rebooted),
   # so restart communication at sequence 0. This must not be counted as a valid
   # reply, otherwise the sequence would advance past 0 before it is ever sent.
+  # For the same reason, Device.reset/1 keeps last_valid_reply at the PD's last
+  # valid reply rather than stamping it for the NAK.
   defp maybe_validate_reply(%{reply: %Reply{name: NAK, data: %ErrorCode{code: 0x04}}} = bus) do
     device = current_device(bus) |> Device.reset()
     register(bus, device)
   end
 
+  # Any other reply, including BUSY and NAKs other than 0x04, counts as a valid
+  # reply: the PD is present and talking, so it is online and not offline-reset.
   defp maybe_validate_reply(bus) do
     device = current_device(bus) |> Device.receive_valid_reply()
     register(bus, device)

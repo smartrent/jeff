@@ -1,7 +1,7 @@
 defmodule BusTest do
   use ExUnit.Case
 
-  alias Jeff.{Bus, Command, Message, Reply, SecureChannel}
+  alias Jeff.{Bus, Command, Device, Message, Reply, SecureChannel}
   alias Jeff.Reply.EncryptionClient
 
   test "adding a device" do
@@ -204,6 +204,18 @@ defmodule BusTest do
       assert next_message(bus).sequence == 0
     end
 
+    test "NAK reset keeps the last valid reply time", %{bus: bus, ack: ack} do
+      {bus, _} = poll_cycle(bus, ack)
+      last_valid_reply = Bus.get_device(bus, 0x01).last_valid_reply
+      assert is_integer(last_valid_reply)
+
+      {bus, _} = poll_cycle(bus, Reply.new(0x01, NAK, <<0x04>>))
+
+      device = Bus.get_device(bus, 0x01)
+      assert device.sequence == 0
+      assert device.last_valid_reply == last_valid_reply
+    end
+
     test "NAK reset sends the queued command next, at sequence 0", %{bus: bus, ack: ack} do
       {bus, _} = poll_cycle(bus, ack)
       {bus, _} = poll_cycle(bus, ack)
@@ -242,6 +254,47 @@ defmodule BusTest do
       refute Bus.current_device(bus).secure_channel.established?
     end
 
+    test "offline reset on a secure device restarts the handshake with CHLNG at sequence 0",
+         %{ack: ack} do
+      bus = Bus.new() |> Bus.add_device(address: 0x01, security?: true)
+      bus = establish_secure_channel(bus, ack)
+
+      bus = silent_for(bus, 0x01, 8_001)
+
+      # See the NAK test above: the security block at sequence 0 is not asserted.
+      bus = bus |> Bus.tick() |> Bus.tick() |> Bus.tick()
+      assert bus.command.name == CHLNG
+      assert Message.new(Bus.current_device(bus), bus.command).sequence == 0
+      refute Bus.current_device(bus).secure_channel.initialized?
+      refute Bus.current_device(bus).secure_channel.established?
+    end
+
+    test "a secure handshake stalled at SCRYPT past the threshold restarts with CHLNG at sequence 0",
+         %{ack: ack} do
+      bus = Bus.new() |> Bus.add_device(address: 0x01, security?: true)
+
+      # CHLNG at sequence 0, answered with CCRYPT
+      bus = bus |> Bus.tick() |> Bus.tick() |> Bus.tick()
+      assert bus.command.name == CHLNG
+      device = Bus.current_device(bus)
+      channel = %{device.secure_channel | initialized?: true}
+      bus = bus |> Bus.put_device(%{device | secure_channel: channel})
+      bus = bus |> Bus.receive_reply(ack) |> Bus.tick()
+
+      # SCRYPT at sequence 1 goes unanswered
+      bus = bus |> Bus.tick() |> Bus.tick() |> Bus.tick()
+      assert bus.command.name == SCRYPT
+      assert Message.new(Bus.current_device(bus), bus.command).sequence == 1
+      bus = bus |> Bus.receive_reply(:timeout) |> Bus.tick()
+
+      bus = silent_for(bus, 0x01, 8_001)
+
+      bus = bus |> Bus.tick() |> Bus.tick() |> Bus.tick()
+      assert bus.command.name == CHLNG
+      assert Message.new(Bus.current_device(bus), bus.command).sequence == 0
+      refute Bus.current_device(bus).secure_channel.initialized?
+    end
+
     test "NAK reset resets the secure channel", %{ack: ack} do
       bus = Bus.new() |> Bus.add_device(address: 0x01)
       {bus, _} = poll_cycle(bus, ack)
@@ -274,6 +327,209 @@ defmodule BusTest do
       assert m0.sequence == 0
       assert m1.sequence == 1
     end
+
+    test "first valid reply after a NAK reset refreshes the last valid reply time",
+         %{bus: bus, ack: ack} do
+      {bus, _} = poll_cycle(bus, ack)
+
+      # an older, but still online, last valid reply so the refresh is observable
+      device = Bus.get_device(bus, 0x01)
+      old = System.monotonic_time(:millisecond) - 5_000
+      bus = Bus.put_device(bus, 0x01, %{device | last_valid_reply: old})
+
+      {bus, _} = poll_cycle(bus, Reply.new(0x01, NAK, <<0x04>>))
+      assert Bus.get_device(bus, 0x01).last_valid_reply == old
+
+      before_reply = System.monotonic_time(:millisecond)
+      {bus, m0} = poll_cycle(bus, ack)
+      assert m0.sequence == 0
+
+      assert Bus.get_device(bus, 0x01).last_valid_reply >= before_reply
+      assert next_message(bus).sequence == 1
+    end
+
+    test "device NAKed while offline comes back online at sequence 0 without another reset",
+         %{bus: bus, ack: ack} do
+      {bus, _} = poll_cycle(bus, ack)
+      {bus, _} = poll_cycle(bus, ack)
+
+      # POLL at sequence 2 is in flight; the last valid reply is past the threshold
+      bus = bus |> Bus.tick() |> Bus.tick() |> Bus.tick()
+      assert Message.new(Bus.current_device(bus), bus.command).sequence == 2
+      device = Bus.current_device(bus)
+      stale = System.monotonic_time(:millisecond) - 8_001
+      bus = Bus.put_device(bus, %{device | last_valid_reply: stale})
+
+      bus = bus |> Bus.receive_reply(Reply.new(0x01, NAK, <<0x04>>)) |> Bus.tick()
+      device = Bus.get_device(bus, 0x01)
+      assert device.sequence == 0
+      assert device.last_valid_reply == stale
+      refute Device.online?(device)
+
+      {bus, m0} = poll_cycle(bus, ack)
+      assert m0.sequence == 0
+      assert Device.online?(Bus.get_device(bus, 0x01))
+
+      {bus, m1} = poll_cycle(bus, ack)
+      {bus, m2} = poll_cycle(bus, ack)
+      assert {m1.sequence, m2.sequence} == {1, 2}
+      assert Device.online?(Bus.get_device(bus, 0x01))
+      assert next_message(bus).sequence == 3
+    end
+
+    test "device offline past the threshold is reset to sequence 0", %{bus: bus, ack: ack} do
+      {bus, _} = poll_cycle(bus, ack)
+      {bus, _} = poll_cycle(bus, ack)
+
+      # simulate the PD being silent for longer than the offline threshold
+      bus = silent_for(bus, 0x01, 8_001)
+      stale = Bus.get_device(bus, 0x01).last_valid_reply
+
+      {bus, m} = poll_cycle(bus, :timeout)
+      assert m.sequence == 0
+
+      # the reset keeps the real last-seen time, and the device stays offline
+      device = Bus.get_device(bus, 0x01)
+      assert device.last_valid_reply == stale
+      refute Device.online?(device)
+
+      # an absent device stays at sequence 0 rather than being reset repeatedly
+      {bus, m} = poll_cycle(bus, :timeout)
+      assert m.sequence == 0
+      assert Bus.get_device(bus, 0x01).last_valid_reply == stale
+
+      # once it replies, communication resumes from sequence 0 and it is online
+      {bus, _} = poll_cycle(bus, ack)
+      device = Bus.get_device(bus, 0x01)
+      assert device.last_valid_reply > stale
+      assert Device.online?(device)
+      assert next_message(bus).sequence == 1
+    end
+
+    test "device within the offline threshold is not reset", %{bus: bus, ack: ack} do
+      {bus, _} = poll_cycle(bus, ack)
+      {bus, _} = poll_cycle(bus, ack)
+
+      bus = silent_for(bus, 0x01, 7_000)
+
+      {_bus, m} = poll_cycle(bus, :timeout)
+      assert m.sequence == 2
+    end
+
+    test "silence is timed from the first unanswered poll", %{bus: bus, ack: ack} do
+      {bus, _} = poll_cycle(bus, ack)
+      assert Bus.get_device(bus, 0x01).unanswered_since == nil
+
+      before = System.monotonic_time(:millisecond)
+      {bus, _} = poll_cycle(bus, :timeout)
+      since = Bus.get_device(bus, 0x01).unanswered_since
+      assert since >= before
+
+      {bus, _} = poll_cycle(bus, :timeout)
+      assert Bus.get_device(bus, 0x01).unanswered_since == since
+
+      {bus, _} = poll_cycle(bus, ack)
+      assert Bus.get_device(bus, 0x01).unanswered_since == nil
+    end
+
+    test "a NAK other than 0x04 counts as a reply and clears the unanswered time",
+         %{bus: bus, ack: ack} do
+      {bus, _} = poll_cycle(bus, ack)
+      {bus, _} = poll_cycle(bus, :timeout)
+      refute Bus.get_device(bus, 0x01).unanswered_since == nil
+
+      {bus, _} = poll_cycle(bus, Reply.new(0x01, NAK, <<0x01>>))
+
+      device = Bus.get_device(bus, 0x01)
+      assert device.unanswered_since == nil
+      assert Device.online?(device)
+      assert device.sequence == 2
+    end
+
+    test "a removed and re-added PD starts fresh at sequence 0", %{bus: bus, ack: ack} do
+      {bus, _} = poll_cycle(bus, ack)
+      {bus, _} = poll_cycle(bus, :timeout)
+
+      bus = bus |> Bus.remove_device(0x01) |> Bus.add_device(address: 0x01)
+
+      device = Bus.get_device(bus, 0x01)
+      assert device.sequence == 0
+      assert device.last_valid_reply == nil
+      assert device.unanswered_since == nil
+      refute Device.online?(device)
+      assert next_message(bus).sequence == 0
+    end
+
+    test "a PD that answers every poll is not reset when polls are far apart",
+         %{bus: bus, ack: ack} do
+      {bus, _} = poll_cycle(bus, ack)
+      {bus, _} = poll_cycle(bus, ack)
+
+      # a slow bus: the last reply is older than the threshold, but no poll went
+      # unanswered
+      device = Bus.get_device(bus, 0x01)
+      old = System.monotonic_time(:millisecond) - 8_001
+      bus = Bus.put_device(bus, 0x01, %{device | last_valid_reply: old})
+
+      {_bus, m} = poll_cycle(bus, ack)
+      assert m.sequence == 2
+    end
+
+    test "a secure handshake completes when polls are far apart", %{ack: ack} do
+      bus = Bus.new() |> Bus.add_device(address: 0x01, security?: true)
+
+      # CHLNG at sequence 0, answered with CCRYPT
+      bus = bus |> Bus.tick() |> Bus.tick() |> Bus.tick()
+      assert bus.command.name == CHLNG
+      device = Bus.current_device(bus)
+      channel = %{device.secure_channel | initialized?: true}
+      bus = bus |> Bus.put_device(%{device | secure_channel: channel})
+      bus = bus |> Bus.receive_reply(ack) |> Bus.tick()
+
+      # a slow bus: more than the threshold passes before this PD's next turn
+      device = Bus.get_device(bus, 0x01)
+      old = System.monotonic_time(:millisecond) - 8_001
+      bus = Bus.put_device(bus, 0x01, %{device | last_valid_reply: old})
+
+      bus = bus |> Bus.tick() |> Bus.tick() |> Bus.tick()
+      assert bus.command.name == SCRYPT
+      assert Message.new(Bus.current_device(bus), bus.command).sequence == 1
+    end
+
+    test "offline reset only affects the stale device" do
+      ack1 = Reply.new(0x01, ACK)
+      bus = Bus.new() |> Bus.add_device(address: 0x01) |> Bus.add_device(address: 0x02)
+
+      # one full round so both devices are at sequence 1
+      bus = Bus.tick(bus)
+      {bus, _} = poll_cycle(bus, ack1)
+      {bus, _} = poll_cycle_from_cursor(bus, Reply.new(0x02, ACK))
+
+      bus = silent_for(bus, 0x01, 8_001)
+
+      bus = Bus.tick(bus)
+      {bus, m1} = poll_cycle_from_cursor(bus, :timeout)
+      {_bus, m2} = poll_cycle_from_cursor(bus, Reply.new(0x02, ACK))
+
+      assert {m1.address, m1.sequence} == {0x01, 0}
+      assert {m2.address, m2.sequence} == {0x02, 1}
+    end
+  end
+
+  # Makes the PD at `address` look silent for `ms`: its last valid reply and its
+  # first unanswered poll are both `ms` ago.
+  defp silent_for(bus, address, ms) do
+    device = Bus.get_device(bus, address)
+    at = System.monotonic_time(:millisecond) - ms
+    Bus.put_device(bus, address, %{device | last_valid_reply: at, unanswered_since: at})
+  end
+
+  # Like poll_cycle/2 but assumes the poll list has already been populated.
+  defp poll_cycle_from_cursor(bus, reply) do
+    bus = bus |> Bus.tick() |> Bus.tick()
+    message = Message.new(Bus.current_device(bus), bus.command)
+    bus = bus |> Bus.receive_reply(reply) |> Bus.tick()
+    {bus, message}
   end
 
   # Runs the CHLNG/SCRYPT handshake for the single secure device at 0x01 using
