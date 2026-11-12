@@ -1,7 +1,8 @@
 defmodule Jeff.Bus do
   @moduledoc false
 
-  alias Jeff.Device
+  alias Jeff.{Device, Reply}
+  alias Jeff.Reply.ErrorCode
 
   defstruct registry: %{},
             command: nil,
@@ -98,6 +99,14 @@ defmodule Jeff.Bus do
   end
 
   defp maybe_validate_reply(%{reply: :timeout} = bus), do: bus
+
+  # NAK - unexpected sequence number. The PD has lost sync (e.g. it rebooted),
+  # so restart communication at sequence 0. This must not be counted as a valid
+  # reply, otherwise the sequence would advance past 0 before it is ever sent.
+  defp maybe_validate_reply(%{reply: %Reply{name: NAK, data: %ErrorCode{code: 0x04}}} = bus) do
+    device = current_device(bus) |> Device.reset()
+    register(bus, device)
+  end
 
   defp maybe_validate_reply(bus) do
     device = current_device(bus) |> Device.receive_valid_reply()
