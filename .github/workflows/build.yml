@@ -12,7 +12,9 @@ jobs:
           - { otp: '25.0.4', elixir: '1.13.4' }
         os:
           - name: Linux
-            runner: ubuntu-latest
+            # Pinned: Hex has no OTP 25 builds for ubuntu-26.04, which
+            # ubuntu-latest now points to. Unpin when the OTP matrix is bumped.
+            runner: ubuntu-24.04
     steps:
       - uses: actions/checkout@v3
 
