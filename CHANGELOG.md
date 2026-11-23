@@ -1,7 +1,16 @@
-## Unreleased
+## [v0.6.0] - 2026-11-23
+
+**Potentially Breaking Changes**
+
+`Jeff.Reply.IdReport` now zero-pads each vendor (OUI) byte to two hex digits,
+so `vendor` is always 6 characters. Previously, bytes below `0x10` lost their
+leading zero (e.g. `<<0x01, 0x01, 0x01>>` was `"111"` and is now `"010101"`).
+Update any stored or hard-coded vendor strings that relied on the old format.
 
 ### Fixed
 
+- Vendor (OUI) codes in PDID reports are now zero-padded to 6 hex characters
+  (CB-305)
 - After a NAK for an unexpected sequence number (error code 0x04), the next
   command to that PD is now sent with sequence number 0. Previously the reset
   was undone in the same tick, so the PD was never re-synchronized (CB-310)
