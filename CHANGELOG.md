@@ -14,6 +14,26 @@ Update any stored or hard-coded vendor strings that relied on the old format.
 - After a NAK for an unexpected sequence number (error code 0x04), the next
   command to that PD is now sent with sequence number 0. Previously the reset
   was undone in the same tick, so the PD was never re-synchronized (CB-310)
+- `Jeff.Device.online?/1` now returns `false` once the last valid reply is older
+  than the offline threshold. Previously it returned `true` no matter how long
+  ago the last reply was (CB-319)
+
+### Changed
+
+- A PD that leaves polls unanswered for longer than the offline threshold (8s),
+  counted from the first unanswered poll, is reset to sequence number 0 so
+  communication restarts cleanly when it comes back. The ACU does not reset a
+  PD that answers every poll, even on a slow bus where its polls are more than
+  8s apart. Per OSDP 2.2 section 5.7 the PD itself still goes offline in that
+  case, so a poll round should be kept under 8s (CB-319)
+- `Jeff.Device.reset/1` no longer sets `last_valid_reply` to `0`. It keeps the
+  time of the PD's last valid reply, so consumers keep an accurate "last seen"
+  time across NAK and offline resets. A PD that was offline stays offline until
+  its next valid reply, and a NAK 0x04 reset no longer marks an online PD as
+  offline (CB-319)
+- A valid reply to a sequence 0 command now updates `last_valid_reply` (CB-319).
+  Any reply other than NAK 0x04 counts as a valid reply, including BUSY and
+  other NAKs, so a PD that answers with them is online and is not reset
 
 ## [v0.5.2] - 2025-09-30
 

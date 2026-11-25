@@ -39,10 +39,12 @@ defmodule DeviceTest do
     assert device.sequence == 2
 
     secure_channel = device.secure_channel
+    last_valid_reply = System.monotonic_time(:millisecond) - 10_000
+    device = %{device | last_valid_reply: last_valid_reply}
 
     assert device = Device.reset(device)
     assert device.sequence == 0
-    assert device.last_valid_reply == 0
+    assert device.last_valid_reply == last_valid_reply
     assert device.secure_channel != secure_channel
   end
 
@@ -117,12 +119,11 @@ defmodule DeviceTest do
     assert device.sequence == 0
     assert device.last_valid_reply == nil
 
-    # increment sqn, do not set last_valid_reply when incrementing from zero
+    # a reply at sqn 0 is a valid reply, so it counts toward being online
     device = Device.receive_valid_reply(device)
     assert device.sequence == 1
-    assert device.last_valid_reply == nil
+    assert_in_delta device.last_valid_reply, System.monotonic_time(:millisecond), 100
 
-    # increment sqn, set last_valid_reply when incrementing non-zero numbers
     device = Device.receive_valid_reply(device)
     assert device.sequence == 2
     assert_in_delta device.last_valid_reply, System.monotonic_time(:millisecond), 100
@@ -130,10 +131,10 @@ defmodule DeviceTest do
 
   test "online?" do
     now = System.monotonic_time(:millisecond)
-    eight_secs = 8000
 
     assert %Device{last_valid_reply: nil} |> Device.online?() == false
     assert %Device{last_valid_reply: now} |> Device.online?() == true
-    assert %Device{last_valid_reply: now + eight_secs} |> Device.online?() == false
+    assert %Device{last_valid_reply: now - 7_000} |> Device.online?() == true
+    assert %Device{last_valid_reply: now - 8_001} |> Device.online?() == false
   end
 end
